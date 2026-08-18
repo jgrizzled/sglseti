@@ -137,10 +137,29 @@ def stable_id(prefix: str, value: Any) -> str:
 def request_id(request: Any) -> str:
     """Stable identity of a calculation request (``req-`` prefix).
 
-    Requests hold resolved epochs, not file locations, so the ID is
-    path-independent by construction.
+    Path-independent: epochs are held resolved (never as file references),
+    and an ephemeris ``path`` is stripped from the identity — a file-backed
+    ephemeris contributes through its content checksum, not its location.
     """
-    return stable_id("req", request)
+    canonical = canonicalize(request)
+    _strip_ephemeris_path(canonical)
+    return stable_id("req", canonical)
+
+
+def _strip_ephemeris_path(canonical: Any) -> None:
+    """Remove a canonicalized EphemerisSpec's ``path`` in place, if present."""
+    if isinstance(canonical, list):
+        for item in canonical:
+            _strip_ephemeris_path(item)
+        return
+    if not isinstance(canonical, dict):
+        return
+    fields = canonical.get("fields")
+    if canonical.get("__dataclass__") == "EphemerisSpec" and isinstance(fields, dict):
+        fields.pop("path", None)
+        return
+    for value in canonical.values():
+        _strip_ephemeris_path(value)
 
 
 def file_sha256(path: str | Path) -> str:

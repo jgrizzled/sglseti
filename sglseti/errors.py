@@ -11,6 +11,7 @@ __all__ = [
     "ConfigError",
     "EphemerisCoverageError",
     "EphemerisError",
+    "GenerationError",
     "SglsetiError",
 ]
 
@@ -29,3 +30,7 @@ class EphemerisError(SglsetiError):
 
 class EphemerisCoverageError(EphemerisError):
     """Raised when a requested epoch lies outside the ephemeris coverage."""
+
+
+class GenerationError(SglsetiError):
+    """Raised when a batch calculation cannot proceed or fails strict mode."""

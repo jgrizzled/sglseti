@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Epoch-neutral batch generator (Phase 5): `generate_loci(request, registry)`
+  produces the deterministic targets × roles × epochs × segments product as
+  `LocusSample` rows plus one `Corridor` per target/role/epoch, with
+  documented stable ordering, preserved caller epoch IDs and joinable
+  pass-through metadata, grid-epoch materialization (`grid-NNNNNN` IDs),
+  per-combination failure isolation (invalid status rows with NaN
+  coordinates and reason codes) or `strict` batch failure, honest
+  uncertainty labeling (`assumed` vs `not_propagated` + warning), and
+  path-independent `calculation_id`/`request_id` (ephemeris identified by
+  content checksum; `EphemerisSpec.path` stripped from identities).
 - Canonical ephemeris kernel and explicit fetch (ADR-0002): JPL DE440s
   pinned by SHA-256 as the canonical kernel; a committed 1.16 MB DE440s
   excerpt (Sun/EMB/Earth, 2010–2035) as the offline real-kernel regression

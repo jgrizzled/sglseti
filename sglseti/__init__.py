@@ -36,6 +36,9 @@ _EXPORTS = {
     "Tusay2022Eq57V1": "sglseti.geometry",
     "compute_relay_solution": "sglseti.geometry",
     "motion_rates": "sglseti.geometry",
+    "generate_loci": "sglseti.generate",
+    "materialize_epochs": "sglseti.generate",
+    "GenerationError": "sglseti.errors",
     "Role": "sglseti.models",
     "EndpointKind": "sglseti.models",
     "Validity": "sglseti.models",
@@ -91,8 +94,10 @@ if TYPE_CHECKING:
         ConfigError,
         EphemerisCoverageError,
         EphemerisError,
+        GenerationError,
         SglsetiError,
     )
+    from .generate import generate_loci, materialize_epochs
     from .geometry import Tusay2022Eq57V1, compute_relay_solution, motion_rates
     from .models import (
         SUPPORTED_MODEL_IDS,
