@@ -36,12 +36,12 @@ terrestrial-site observers are never mixed silently.
 | identity | `corridor_id`, `calculation_id`, `epoch_id`, `target_id`, `role`, `sample_id` |
 | time | `observation_time_utc`, `observation_time_tdb_jd`, `catalog_direction_epoch_tdb_jd`, `relay_event_epoch_tdb_jd_approx`, `solar_lens_epoch_tdb_jd_approx`, `target_event_epoch_tdb_jd_approx`, `target_event_kind` |
 | light times [d] | `target_light_time_days`, `sun_relay_light_time_days`, `observer_relay_light_time_days_approx` |
-| range | `z_au` (representative reciprocal-midpoint distance), `q_per_au` = 1/z |
-| geometry | `icrs_ra_deg`, `icrs_dec_deg`, `observer_id` |
+| range | `z_au` (representative reciprocal-midpoint distance), `q_per_au` = 1/z; represented interval `z_near_au`, `z_far_au`, `q_lo_per_au`, `q_hi_per_au` |
+| geometry | `icrs_ra_deg`, `icrs_dec_deg`, `observer_id`; interval-boundary coordinates `near_icrs_*`, `far_icrs_*` — the coverage extremes a pointing footprint must contain |
 | model | `model_id`, `model_version`; approximation flags `rho_equals_z_assumed`, `constant_target_distance_assumed`, `linear_stellar_motion_assumed`, `solar_motion_neglected`; `catalog_epoch_semantics` |
 | provenance | `target_source_hash`, `ephemeris_id` (content checksum for file-backed kernels) |
 | quality | `validity` (valid/degraded/invalid), `uncertainty_method` (assumed/not_propagated), `warnings` (`;`-joined machine-readable codes) |
-| optional | `cirs_*`, `altaz_*`, `rate_ra_cosdec_arcsec_per_hr`, `rate_dec_arcsec_per_hr` (central finite difference, 60 s step) |
+| optional | `cirs_*`, `altaz_*`, `rate_ra_cosdec_arcsec_per_hr`, `rate_dec_arcsec_per_hr` (central finite difference, 60 s step), `near_rate_*` (rates at the near boundary — the interval's fastest point, used for motion padding) |
 
 Invalid rows carry NaN (ECSV/CSV) or `null` (JSON) coordinates plus a
 reason code — never a fabricated position.
@@ -57,22 +57,38 @@ reason code — never a fabricated position.
   `z_au`.
 - `visibility.ecsv`: per role/epoch — `altitude_deg`, `azimuth_deg`,
   `sun_altitude_deg`, `moon_separation_deg`, `constraints_passed`,
-  `failed_constraints`. Thresholds are inclusive.
+  `failed_constraints`, `warnings` (Earth-orientation degradation is
+  labeled, never silent). Reported values are the corridor's representative
+  sample; the pass/fail verdict also covers the corridor's angular extreme
+  points, so an endpoint cannot silently fail a threshold the middle
+  sample meets. Thresholds are inclusive.
 - `pointings.ecsv`: candidate zones with the conservative radius and its
   labeled components: `radius_arcsec = track_extent_arcsec +
-  assumed_half_width_arcsec + motion_padding_arcsec`
-  (`propagated_half_width_arcsec` is always empty in v1). Windows
+  assumed_half_width_arcsec + motion_padding_arcsec + window_drift_arcsec`
+  (`propagated_half_width_arcsec` is always empty in v1). The track extent
+  covers every grouped sample's representative *and* interval-boundary
+  coordinates; `window_drift_arcsec` bounds the group's motion across the
+  advertised window's grid epochs; `z_near_au`/`z_far_au` state the
+  relay-distance interval the pointing claims to cover. Windows
   (`window_start_utc`/`window_stop_utc`) are grid-sampled;
   `representative_time_utc` is the window's middle grid point.
 
 ## Warning codes
 
-`below_solar_focal_minimum`, `long_propagation_span`,
-`missing_radial_velocity`, `relay_beyond_model_bound` (invalid),
-`ephemeris_out_of_coverage:*` (invalid), `uncertainty_not_propagated`,
+`below_solar_focal_minimum` (degraded; below the finite-source photospheric
+threshold `f_inf·d/(d − f_inf)`), `long_propagation_span`,
+`missing_radial_velocity`, `outside_search_prior` (degraded; beyond the
+Tusay et al. `z < d/10` probe-placement prior — a study restriction, not a
+physical bound), `ephemeris_out_of_coverage:*` (invalid),
+`iers_out_of_coverage` (degraded; apparent/site products at epochs outside
+the pinned Earth-orientation table), `uncertainty_not_propagated`,
 `invalid_sample_count:N`, `degraded_sample_count:N`,
-`no_visible_window:target/role`, `group_exceeds_usable_fov`, plus
-`astropy:*` propagation messages.
+`no_visible_window:target/role`, `no_operational_samples:target/role`,
+`group_exceeds_usable_fov`, plus `astropy:*` propagation and
+coordinate-transform messages (any captured transform warning degrades an
+otherwise valid sample). `invalid` is reserved for uninterpretable
+results; `below_solar_focal_minimum` and `outside_search_prior` are also
+surfaced on any pointing built from a flagged sample.
 
 ## Uncertainty
 

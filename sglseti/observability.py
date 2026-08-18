@@ -6,6 +6,13 @@ constraints, and finds every contiguous valid window on a sampled time grid
 — there is no single "best time" that hides disjoint windows; each window
 carries a documented representative epoch (its middle grid point).
 
+Window boundaries are grid-sampled: constraint crossings between grid
+points are not solved for, so window start/stop are accurate to the grid
+cadence. Choose the request's time cadence against the constraint margins
+that matter; the evaluation itself can cover a corridor's angular extremes
+via ``probe_points`` so a wide corridor cannot pass on its middle sample
+alone.
+
 Conventions: directions are geometric (refraction disabled); altitudes come
 from the astropy AltAz frame; Moon separation is the angle between the
 topocentric Moon direction and the locus line of sight. These values assist
@@ -18,10 +25,11 @@ passes.
 from __future__ import annotations
 
 import math
+import warnings as _warnings
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from .ephemeris import Ephemeris, offline_resources
+from .ephemeris import WARN_IERS_COVERAGE, Ephemeris, IersResource, offline_resources
 from .errors import PlanningError
 from .geometry import observer_barycentric_au
 from .models import (
@@ -91,11 +99,26 @@ def visibility_sample(
     observer: Observer,
     ephemeris: Ephemeris,
     constraints: ObservabilityConstraints,
+    iers: IersResource | None = None,
+    probe_points: tuple[tuple[float, float], ...] = (),
 ) -> VisibilitySample:
-    """Evaluate site context for one locus sample at its epoch."""
+    """Evaluate site context for one locus sample at its epoch.
+
+    ``iers`` installs a pinned Earth-orientation table for the AltAz
+    transforms. Degraded Earth orientation (captured astropy warnings, or an
+    epoch outside a pinned table's coverage) is recorded on the returned
+    sample's ``warnings`` — never silently dropped.
+
+    ``probe_points`` are additional geometric ICRS ``(ra, dec)`` directions
+    — typically a corridor's angular extremes — whose target-altitude and
+    Moon-separation constraints must also pass; the representative sample's
+    values are reported, but the pass/fail verdict covers every probe so a
+    corridor endpoint cannot silently fail a threshold the middle sample
+    meets. Failure codes are the union across probes.
+    """
     if observer.kind is not ObserverKind.SITE:
         raise PlanningError("observability requires a terrestrial site observer")
-    if math.isnan(sample.icrs_ra_deg):
+    if not sample.is_operational:
         return VisibilitySample(
             target_id=sample.target_id,
             role=sample.role,
@@ -109,25 +132,54 @@ def visibility_sample(
             failed_constraints=("sample_invalid",),
         )
 
-    altitude, azimuth = _direction_altaz(
-        sample.icrs_ra_deg, sample.icrs_dec_deg, epoch.time, observer
-    )
-    with offline_resources():
-        observer_au = observer_barycentric_au(observer, epoch.time, ephemeris)
-        sun_direction = ephemeris.sun_barycentric_au(epoch.time) - observer_au
-        moon_direction = ephemeris.moon_barycentric_au(epoch.time) - observer_au
-    sun_ra, sun_dec = _vector_radec(sun_direction)
-    sun_altitude, _ = _direction_altaz(sun_ra, sun_dec, epoch.time, observer)
+    iers_table = iers.table if iers is not None else None
+    warnings: list[str] = []
+    if iers is not None and not iers.covers(epoch.time):
+        warnings.append(WARN_IERS_COVERAGE)
+    with _warnings.catch_warnings(record=True) as caught:
+        _warnings.simplefilter("always")
+        altitude, azimuth = _direction_altaz(
+            sample.icrs_ra_deg,
+            sample.icrs_dec_deg,
+            epoch.time,
+            observer,
+            iers_table=iers_table,
+        )
+        probe_altaz = tuple(
+            _direction_altaz(ra, dec, epoch.time, observer, iers_table=iers_table)
+            for ra, dec in probe_points
+        )
+        with offline_resources():
+            observer_au = observer_barycentric_au(observer, epoch.time, ephemeris)
+            sun_direction = ephemeris.sun_barycentric_au(epoch.time) - observer_au
+            moon_direction = ephemeris.moon_barycentric_au(epoch.time) - observer_au
+        sun_ra, sun_dec = _vector_radec(sun_direction)
+        sun_altitude, _ = _direction_altaz(
+            sun_ra, sun_dec, epoch.time, observer, iers_table=iers_table
+        )
+    warnings.extend(dict.fromkeys(f"astropy:{w.message}" for w in caught))
     moon_ra, moon_dec = _vector_radec(moon_direction)
     moon_separation = _separation_deg(
         sample.icrs_ra_deg, sample.icrs_dec_deg, moon_ra, moon_dec
     )
-    passed, failed = evaluate_constraints(
+    passed, failed_list = evaluate_constraints(
         altitude_deg=altitude,
         sun_altitude_deg=sun_altitude,
         moon_separation_deg=moon_separation,
         constraints=constraints,
     )
+    failed = list(failed_list)
+    for (ra, dec), (probe_altitude, _azimuth) in zip(
+        probe_points, probe_altaz, strict=True
+    ):
+        probe_passed, probe_failed = evaluate_constraints(
+            altitude_deg=probe_altitude,
+            sun_altitude_deg=sun_altitude,
+            moon_separation_deg=_separation_deg(ra, dec, moon_ra, moon_dec),
+            constraints=constraints,
+        )
+        passed = passed and probe_passed
+        failed.extend(code for code in probe_failed if code not in failed)
     return VisibilitySample(
         target_id=sample.target_id,
         role=sample.role,
@@ -138,7 +190,8 @@ def visibility_sample(
         sun_altitude_deg=sun_altitude,
         moon_separation_deg=moon_separation,
         constraints_passed=passed,
-        failed_constraints=failed,
+        failed_constraints=tuple(failed),
+        warnings=tuple(warnings),
     )
 
 
@@ -189,7 +242,11 @@ def find_windows(
 
 
 def _direction_altaz(
-    ra_deg: float, dec_deg: float, time: Time, observer: Observer
+    ra_deg: float,
+    dec_deg: float,
+    time: Time,
+    observer: Observer,
+    iers_table: Any | None = None,
 ) -> tuple[float, float]:
     from astropy import units as u
     from astropy.coordinates import AltAz, EarthLocation, SkyCoord
@@ -200,7 +257,7 @@ def _direction_altaz(
         lat=observer.latitude_deg * u.deg,
         height=observer.height_m * u.m,
     )
-    with offline_resources():
+    with offline_resources(iers_table=iers_table):
         altaz = SkyCoord(ra=ra_deg * u.deg, dec=dec_deg * u.deg, frame="icrs").transform_to(
             AltAz(obstime=time, location=location)
         )

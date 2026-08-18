@@ -96,9 +96,11 @@ def test_pointings_are_candidate_zones_with_windows(context) -> None:
         assert pointing.radius_arcsec == pytest.approx(
             pointing.track_extent_arcsec
             + (pointing.assumed_half_width_arcsec or 0.0)
-            + pointing.motion_padding_arcsec,
+            + pointing.motion_padding_arcsec
+            + pointing.window_drift_arcsec,
             abs=1e-9,
         )
+        assert pointing.window_drift_arcsec >= 0.0
         assert pointing.assumed_half_width_arcsec == 30.0
         assert pointing.propagated_half_width_arcsec is None
         assert pointing.motion_padding_arcsec > 0.0  # exposure_s configured

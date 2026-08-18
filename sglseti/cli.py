@@ -176,10 +176,17 @@ def _cmd_fetch_ephemeris(args: argparse.Namespace) -> int:
 
 
 def _cmd_fetch_iers(args: argparse.Namespace) -> int:
-    from .resources import refresh_iers
+    from .resources import fetch_iers
 
-    path = refresh_iers()
-    print(f"IERS-A table refreshed in astropy cache: {path}")
+    result = fetch_iers(args.output_dir, url=args.url)
+    print(f"fetched:  {result.path}")
+    print(f"sha256:   {result.sha256}")
+    print(f"source:   {result.source_url}")
+    print(f"coverage: {result.coverage_start_utc} to {result.coverage_end_utc}")
+    print("request snippet:")
+    print("  iers:")
+    print(f"    path: {result.path}")
+    print(f"    checksum_sha256: {result.sha256}")
     return 0
 
 
@@ -307,7 +314,17 @@ def build_parser() -> argparse.ArgumentParser:
     fetch_ephemeris.set_defaults(func=_cmd_fetch_ephemeris)
 
     fetch_iers = fetch_kind.add_parser(
-        "iers", help="Refresh astropy's cached IERS-A Earth-orientation table."
+        "iers",
+        help=(
+            "Download the IERS-A Earth-orientation table as a pinned, "
+            "checksum-identified local file for request 'iers' blocks."
+        ),
+    )
+    fetch_iers.add_argument(
+        "--output-dir", required=True, help="Directory to place the table in."
+    )
+    fetch_iers.add_argument(
+        "--url", help="Explicit table URL instead of astropy's IERS-A default."
     )
     fetch_iers.set_defaults(func=_cmd_fetch_iers)
 

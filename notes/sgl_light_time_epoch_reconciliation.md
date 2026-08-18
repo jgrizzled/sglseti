@@ -5,7 +5,6 @@ status: "Resolved v1 science design note"
 applies_to:
   - notes/seti_strategies_for_sgl_technosignatures.md
   - notes/sglseti_python_package_prd.md
-  - notes/implementation_plan.md
   - sgl-search-planner/sgl_search/geometry.py
 ---
 
@@ -25,9 +24,9 @@ The apparent discrepancy came from using “target position” for two different
 1. the target's **physical position at a remote emission or arrival event**; and
 2. its **catalog astrometric direction indexed by light-arrival time at the Solar-System barycenter**.
 
-Gaia astrometry and Astropy/ERFA catalog propagation use the second convention. In that convention, interstellar retardation is already implicit in the astrometric direction. Applying *SkyCoord.apply_space_motion()* at the remote physical emission epoch would count the target–Solar-System light time a second time.
+Gaia astrometry and Astropy/ERFA catalog propagation use the second convention. In that convention, interstellar retardation is already implicit in the astrometric direction. Applying _SkyCoord.apply_space_motion()_ at the remote physical emission epoch would count the target–Solar-System light time a second time.
 
-V1 will implement the published approximation as the explicitly named model *tusay2022_eq5_7_v1*. It will retain the public roles *antipode*, *rx*, and *tx*, expose the role-specific epochs and approximation flags, and not describe this model as a full light-time solution.
+V1 will implement the published approximation as the explicitly named model _tusay2022_eq5_7_v1_. It will retain the public roles _antipode_, _rx_, and _tx_, expose the role-specific epochs and approximation flags, and not describe this model as a full light-time solution.
 
 ---
 
@@ -44,14 +43,14 @@ Tusay et al. define \(\mathbf{x}(t)\) as the target-star direction from the Sun 
 Their key semantic point is that the star position seen at observation time \(t\) is already its apparent, retarded position. They derive
 
 \[
-\mathbf{P}_{\rm tx}
+\mathbf{P}\_{\rm tx}
 =\mathbf{S}(t)-z\mathbf{x}(t+2d/c)
 \]
 
 and
 
 \[
-\mathbf{P}_{\rm rx}
+\mathbf{P}\_{\rm rx}
 =\mathbf{S}(t)-z\mathbf{x}(t-2z/c).
 \]
 
@@ -75,7 +74,7 @@ u-d/c.
 
 ### 2.3 Astropy/ERFA propagation
 
-*SkyCoord.apply_space_motion()* calls ERFA/SOFA catalog-propagation routines. ERFA's *starpm* implementation propagates from an observed place at the first epoch to an observed place at the second epoch and accounts for the change in light time caused by radial motion.
+_SkyCoord.apply_space_motion()_ calls ERFA/SOFA catalog-propagation routines. ERFA's _starpm_ implementation propagates from an observed place at the first epoch to an observed place at the second epoch and accounts for the change in light time caused by radial motion.
 
 For Gaia-like catalog parameters,
 
@@ -96,7 +95,7 @@ Let:
 - \(\rho\): relay-to-observer light-path length;
 - \(z\): relay-to-Sun light-path length, approximated by heliocentric relay distance;
 - \(d\): Sun-to-target light-path length, approximated by catalog distance;
-- \(t_\ell\): time at which the interstellar signal passes the Solar lens; and
+- \(t\_\ell\): time at which the interstellar signal passes the Solar lens; and
 - \(\mathbf{a}(u)\): target astrometric direction indexed by arrival epoch \(u\).
 
 Ignoring relativistic corrections and path bending in the travel-time scalar,
@@ -120,7 +119,7 @@ and the light by which we observe the relay then travels
 The signal passes the Solar lens one Sun–relay light time before the relay event:
 
 \[
-t_{\ell,{\rm rx}}
+t\_{\ell,{\rm rx}}
 =t_p-z/c
 =t_o-(\rho+z)/c.
 \]
@@ -128,29 +127,29 @@ t_{\ell,{\rm rx}}
 The incoming wavefront direction at that Solar event is the target's catalog direction with astrometric arrival epoch
 
 \[
-u_{\rm rx}=t_o-(\rho+z)/c.
+u\_{\rm rx}=t_o-(\rho+z)/c.
 \]
 
 The associated physical emission event at the target is approximately
 
 \[
-t_{e,{\rm rx}}
-=u_{\rm rx}-d/c
+t*{e,{\rm rx}}
+=u*{\rm rx}-d/c
 =t_o-(\rho+z+d)/c.
 \]
 
 These are two descriptions of the same photons:
 
-- a physical-state solver propagates a physical target state to \(t_{e,{\rm rx}}\);
-- a Gaia-like catalog solver propagates an arrival-indexed astrometric direction to \(u_{\rm rx}\).
+- a physical-state solver propagates a physical target state to \(t\_{e,{\rm rx}}\);
+- a Gaia-like catalog solver propagates an arrival-indexed astrometric direction to \(u\_{\rm rx}\).
 
 For an Earth observer and a relay hundreds of AU away, \(\rho\simeq z\). The catalog-direction expression becomes
 
 \[
-u_{\rm rx}\simeq t_o-2z/c,
+u\_{\rm rx}\simeq t_o-2z/c,
 \]
 
-which is Tusay equation 7 and the prototype's *receiver* branch.
+which is Tusay equation 7 and the prototype's _receiver_ branch.
 
 The interstellar term \(d/c\) appears in the physical emission epoch. It must not also be subtracted from the catalog direction epoch, because the catalog direction is already retarded by the target-to-SSB light time.
 
@@ -163,7 +162,7 @@ For a local transmitter, a signal travels
 The Solar-lens passage is
 
 \[
-t_{\ell,{\rm tx}}
+t\_{\ell,{\rm tx}}
 =t_p+z/c
 =t_o+(z-\rho)/c.
 \]
@@ -171,41 +170,41 @@ t_{\ell,{\rm tx}}
 The signal reaches the physical target approximately one interstellar light time later:
 
 \[
-t_{a,{\rm tx}}
-=t_{\ell,{\rm tx}}+d/c
+t*{a,{\rm tx}}
+=t*{\ell,{\rm tx}}+d/c
 =t_o+(z-\rho+d)/c.
 \]
 
 To obtain that future physical state from an arrival-indexed catalog direction, solve
 
 \[
-u_{\rm tx}-d/c=t_{a,{\rm tx}},
+u*{\rm tx}-d/c=t*{a,{\rm tx}},
 \]
 
 giving
 
 \[
-u_{\rm tx}
+u\_{\rm tx}
 =t_o+(z-\rho)/c+2d/c.
 \]
 
 With \(\rho\simeq z\), the local observer–relay and relay–Sun light times cancel:
 
 \[
-u_{\rm tx}\simeq t_o+2d/c,
+u\_{\rm tx}\simeq t_o+2d/c,
 \]
 
-which is Tusay equation 6 and the prototype's *transmitter* branch.
+which is Tusay equation 6 and the prototype's _transmitter_ branch.
 
 The factor of two is not two future signal flights. One \(d/c\) advances from the local epoch to physical target arrival; the other converts that physical event time back to the arrival-time coordinate used by catalog astrometry.
 
 ### 3.4 Summary
 
-| Role | Physical target state represented | Catalog direction epoch | Tusay approximation |
-|---|---|---|---|
-| *antipode* | state seen near \(t_o-d/c\) | \(u=t_o\) | \(\mathbf{x}(t_o)\) |
-| *rx* | emission at \(t_o-(\rho+z+d)/c\) | \(u=t_o-(\rho+z)/c\) | \(\mathbf{x}(t_o-2z/c)\) |
-| *tx* | arrival at \(t_o+(z-\rho+d)/c\) | \(u=t_o+(z-\rho)/c+2d/c\) | \(\mathbf{x}(t_o+2d/c)\) |
+| Role       | Physical target state represented | Catalog direction epoch   | Tusay approximation      |
+| ---------- | --------------------------------- | ------------------------- | ------------------------ |
+| _antipode_ | state seen near \(t_o-d/c\)       | \(u=t_o\)                 | \(\mathbf{x}(t_o)\)      |
+| _rx_       | emission at \(t_o-(\rho+z+d)/c\)  | \(u=t_o-(\rho+z)/c\)      | \(\mathbf{x}(t_o-2z/c)\) |
+| _tx_       | arrival at \(t_o+(z-\rho+d)/c\)   | \(u=t_o+(z-\rho)/c+2d/c\) | \(\mathbf{x}(t_o+2d/c)\) |
 
 ---
 
@@ -215,7 +214,7 @@ The strategy note's physical description was sound: Rx photons were emitted at t
 
 Its implementation guidance was ambiguous because it said to propagate the target to the emission epoch without defining whether the propagation object was:
 
-- a physical barycentric state \(\mathbf{r}_\star(t)\); or
+- a physical barycentric state \(\mathbf{r}\_\star(t)\); or
 - a Gaia-like, arrival-indexed astrometric direction \(\mathbf{a}(u)\).
 
 Those objects require different time arguments. V1 uses the second because it starts from catalog astrometric parameters. A future physical-state model may use the first, but the two conventions must not be mixed.
@@ -226,7 +225,7 @@ Those objects require different time arguments. V1 uses the second because it st
 
 ### 5.1 Correct and reusable
 
-[GeometryEngine._direction_epoch()](../sgl-search-planner/sgl_search/geometry.py) correctly implements the published Tusay epoch offsets:
+[GeometryEngine.\_direction_epoch()](../sgl-search-planner/sgl_search/geometry.py) correctly implements the published Tusay epoch offsets:
 
     if role == "receiver":
         return obstime - (2.0 * z_au * u.au / c).to(u.day)
@@ -234,14 +233,14 @@ Those objects require different time arguments. V1 uses the second because it st
         distance = target_at_obstime.distance
         return obstime + (2.0 * distance / c).to(u.day)
 
-[GeometryEngine.target_coord()](../sgl-search-planner/sgl_search/geometry.py) followed by *apply_space_motion()* is conceptually compatible with an arrival-indexed catalog direction because Astropy uses ERFA catalog propagation.
+[GeometryEngine.target_coord()](../sgl-search-planner/sgl_search/geometry.py) followed by _apply_space_motion()_ is conceptually compatible with an arrival-indexed catalog direction because Astropy uses ERFA catalog propagation.
 
 ### 5.2 Required changes in sglseti
 
 The new implementation must not copy the prototype without these changes:
 
-1. Name and version the model *tusay2022_eq5_7_v1*.
-2. Document that *catalog_direction_epoch* is an astrometric arrival epoch, not a physical target-event epoch.
+1. Name and version the model _tusay2022_eq5_7_v1_.
+2. Document that _catalog_direction_epoch_ is an astrometric arrival epoch, not a physical target-event epoch.
 3. Return both the catalog direction epoch and the inferred physical emission or arrival epoch.
 4. Record the approximations \(\rho=z\), constant \(d\), linear stellar motion, and neglected Solar motion during local light travel.
 5. Calculate \(d\) through a declared Sun–target or SSB–target approximation rather than silently reading a propagated coordinate's distance.
@@ -276,15 +275,15 @@ These estimates are diagnostics, not v1 numerical acceptance tolerances.
 
 ### 7.1 Model behavior
 
-For model *tusay2022_eq5_7_v1*:
+For model _tusay2022_eq5_7_v1_:
 
 1. Interpret the requested epoch as observer reception epoch \(t_o\).
 2. Interpret target catalog propagation epochs as astrometric arrival epochs.
 3. Use:
 
-       antipode: u = t_o
-       rx:       u = t_o - 2z/c
-       tx:       u = t_o + 2d/c
+   antipode: u = t_o
+   rx: u = t_o - 2z/c
+   tx: u = t_o + 2d/c
 
 4. Construct the published first-order relay locus from the Solar position at \(t_o\).
 5. Project the relay position from the selected observer at \(t_o\).
@@ -294,27 +293,27 @@ For model *tusay2022_eq5_7_v1*:
 
 Each locus sample must expose:
 
-- *observation_epoch*;
-- *catalog_direction_epoch*;
-- *catalog_epoch_semantics = ssb_light_arrival_time*;
-- *relay_event_epoch_approx*;
-- *solar_lens_epoch_approx*;
-- *target_event_epoch_approx*;
-- *target_event_kind = emission | arrival | apparent_state*;
-- *target_light_time*;
-- *sun_relay_light_time*;
-- *observer_relay_light_time_approx*;
-- *rho_equals_z_assumed*;
-- *solar_motion_neglected*;
+- _observation_epoch_;
+- _catalog_direction_epoch_;
+- _catalog_epoch_semantics = ssb_light_arrival_time_;
+- _relay_event_epoch_approx_;
+- _solar_lens_epoch_approx_;
+- _target_event_epoch_approx_;
+- _target_event_kind = emission | arrival | apparent_state_;
+- _target_light_time_;
+- _sun_relay_light_time_;
+- _observer_relay_light_time_approx_;
+- _rho_equals_z_assumed_;
+- _solar_motion_neglected_;
 - target reference time scale and propagation-library version; and
 - model ID and version.
 
 ### 7.3 Terminology
 
 - Do not name \(t_o-2z/c\) the target emission epoch. It is the catalog-direction, or approximate Solar-arrival, epoch.
-- Do not pass a physical target emission epoch to *apply_space_motion()* for this model.
+- Do not pass a physical target emission epoch to _apply_space_motion()_ for this model.
 - Do not describe the Tusay model as a full finite-light-time solution.
-- Reserve names such as *physical_state* or *iterative_lighttime* for models whose state provider and event equations use physical coordinate times consistently.
+- Reserve names such as _physical_state_ or _iterative_lighttime_ for models whose state provider and event equations use physical coordinate times consistently.
 
 ---
 
@@ -322,8 +321,8 @@ Each locus sample must expose:
 
 1. **Published-equation test:** a direct implementation of Tusay equations 5–7 must match the model output.
 2. **Arrival-versus-emission test:** a constant-velocity synthetic target must produce the same axis when calculated from:
-   - a physical state at \(t_{e,{\rm rx}}\) or \(t_{a,{\rm tx}}\); and
-   - the equivalent arrival-indexed catalog direction at \(u_{\rm rx}\) or \(u_{\rm tx}\).
+   - a physical state at \(t*{e,{\rm rx}}\) or \(t*{a,{\rm tx}}\); and
+   - the equivalent arrival-indexed catalog direction at \(u*{\rm rx}\) or \(u*{\rm tx}\).
 3. **No-double-retardation test:** evaluating the catalog direction at the physical Rx emission epoch must differ by the expected extra \(d/c\) of proper motion and must not match the accepted fixture.
 4. **Zero-motion test:** all roles share the same target direction when target transverse motion is zero; relay parallax remains range-dependent.
 5. **High-proper-motion test:** Barnard's Star has the expected sign and approximate scale for Rx and Tx offsets.
@@ -347,5 +346,5 @@ Each locus sample must expose:
 4. Astropy documentation, “Accounting for Space Motion.”
    <https://docs.astropy.org/en/stable/coordinates/apply_space_motion.html>
 
-5. ERFA *starpm* source and routine documentation, which propagate catalog data between observed places and explicitly solve the change in light time.
+5. ERFA _starpm_ source and routine documentation, which propagate catalog data between observed places and explicitly solve the change in light time.
    <https://github.com/liberfa/erfa/blob/master/src/starpm.c>

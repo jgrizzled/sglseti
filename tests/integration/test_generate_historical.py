@@ -87,7 +87,7 @@ def test_rows_carry_full_scientific_metadata(result_and_request) -> None:
     sample = result.samples[0]
     assert sample.calculation_id == result.calculation_id
     assert sample.model_id == "tusay2022_eq5_7_v1"
-    assert sample.model_version == "1.0.0"
+    assert sample.model_version == "1.1.0"
     assert sample.ephemeris_id == "astropy_builtin"
     assert sample.target_source_hash.startswith("sha256:")
     assert sample.observer_id == "example-kitt-peak"

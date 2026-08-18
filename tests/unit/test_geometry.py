@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 import pytest
 from astropy.time import Time
 from support import AU_PER_PC, FakeEphemeris, separation_arcsec
@@ -14,6 +16,7 @@ from sglseti.geometry import (
     cirs_apparent,
     compute_relay_solution,
     observer_barycentric_au,
+    solar_focal_min_au,
 )
 from sglseti.models import (
     AstrometricState,
@@ -62,7 +65,7 @@ def test_protocol_conformance() -> None:
     assert isinstance(EPHEMERIS, Ephemeris)
     assert isinstance(AstropyEphemeris(), Ephemeris)
     assert MODEL.model_id == "tusay2022_eq5_7_v1"
-    assert MODEL.model_version == "1.0.0"
+    assert MODEL.model_version == "1.1.0"
 
 
 def test_direction_matches_direct_astropy_propagation() -> None:
@@ -92,18 +95,38 @@ def test_direction_matches_direct_astropy_propagation() -> None:
     )
 
 
-def test_z_beyond_model_bound_is_invalid() -> None:
-    # d = 200000 au, so z > 20000 au violates the published z < d/10 bound.
+def test_z_beyond_search_prior_is_degraded_not_invalid() -> None:
+    # d = 200000 au, so z > 20000 au exceeds the paper's z < d/10 search
+    # prior. The equations remain evaluable: degraded with a distinct code,
+    # never invalid (review finding 6).
     solution = MODEL.target_direction(make_target(), T_O, 25_000.0, Role.RX, EPHEMERIS)
-    assert solution.validity is Validity.INVALID
-    assert "relay_beyond_model_bound" in solution.warnings
+    assert solution.validity is Validity.DEGRADED
+    assert "outside_search_prior" in solution.warnings
 
 
-def test_below_solar_focal_minimum_warns() -> None:
+def test_below_finite_source_focal_threshold_degrades() -> None:
     solution = MODEL.target_direction(make_target(), T_O, 500.0, Role.ANTIPODE, EPHEMERIS)
     assert "below_solar_focal_minimum" in solution.warnings
-    assert solution.validity is Validity.VALID  # warning, not degradation
+    assert solution.validity is Validity.DEGRADED  # review finding 4
     assert 500.0 < SOLAR_FOCAL_MIN_AU
+
+
+def test_finite_source_focal_threshold_exceeds_infinite_source_constant() -> None:
+    # z_min = f_inf d / (d - f_inf) > f_inf for every finite d; a sample
+    # between the two thresholds lenses light from infinity but not from
+    # this target.
+    d_au = 200_000.0
+    threshold = solar_focal_min_au(d_au)
+    assert threshold > SOLAR_FOCAL_MIN_AU
+    assert threshold == pytest.approx(
+        SOLAR_FOCAL_MIN_AU * d_au / (d_au - SOLAR_FOCAL_MIN_AU)
+    )
+    between = (SOLAR_FOCAL_MIN_AU + threshold) / 2.0
+    solution = MODEL.target_direction(make_target(), T_O, between, Role.ANTIPODE, EPHEMERIS)
+    assert "below_solar_focal_minimum" in solution.warnings
+    assert solution.validity is Validity.DEGRADED
+    # A source at or inside f_inf can never reach focus.
+    assert solar_focal_min_au(SOLAR_FOCAL_MIN_AU) == math.inf
 
 
 def test_missing_radial_velocity_degrades_explicitly() -> None:

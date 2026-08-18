@@ -29,6 +29,7 @@ from .models import (
     Epoch,
     FieldOfView,
     GeometryRequest,
+    IersSpec,
     ObservabilityConstraints,
     Observer,
     ObserverKind,
@@ -281,6 +282,7 @@ _TOP_KEYS = {
     "relay_range",
     "model",
     "ephemeris",
+    "iers",
     "products",
     "uncertainty",
     "observability",
@@ -312,6 +314,7 @@ def load_request(path: str | Path) -> GeometryRequest:
     relay_range, sampling = _parse_relay_range(data.get("relay_range"), fail)
     model_id, model_parameters = _parse_model(data.get("model"), fail)
     ephemeris = _parse_ephemeris(data.get("ephemeris"), fail)
+    iers = _parse_iers(data.get("iers"), fail)
     coordinate_products, include_rates, output_formats = _parse_products(
         data.get("products"), fail
     )
@@ -332,6 +335,7 @@ def load_request(path: str | Path) -> GeometryRequest:
         model_id=model_id,
         model_parameters=model_parameters,
         ephemeris=ephemeris,
+        iers=iers,
         coordinate_products=coordinate_products,
         include_rates=include_rates,
         output_formats=output_formats,
@@ -531,6 +535,24 @@ def _parse_ephemeris(raw: Any, fail: _Fail) -> EphemerisSpec:
     else:
         _check_keys(block, {"adapter"}, "ephemeris", fail)
         spec = _build("ephemeris", fail, EphemerisSpec, adapter=adapter)
+    return spec
+
+
+def _parse_iers(raw: Any, fail: _Fail) -> IersSpec | None:
+    if raw is None:
+        return None
+    block = _mapping(raw, "iers", fail)
+    _check_keys(block, {"path", "checksum_sha256"}, "iers", fail)
+    checksum = block.get("checksum_sha256")
+    if checksum is not None and not isinstance(checksum, str):
+        fail("iers.checksum_sha256", "must be a 'sha256:<hex>' string")
+    spec: IersSpec = _build(
+        "iers",
+        fail,
+        IersSpec,
+        path=_string(block, "path", "iers", fail),
+        checksum_sha256=checksum,
+    )
     return spec
 
 

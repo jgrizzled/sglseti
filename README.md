@@ -97,9 +97,12 @@ sglseti fetch ephemeris de440s --output-dir resources/
 #     path: resources/de440s.bsp
 ```
 
-`sglseti fetch iers` optionally refreshes astropy's Earth-orientation
-tables (sub-arcsecond effect; never required). The `jpl_file` adapter needs
-the `jpl` extra: `uv sync --extra jpl` or `pip install 'sglseti[jpl]'`.
+`sglseti fetch iers --output-dir resources/` optionally downloads the
+IERS-A Earth-orientation table as a pinned, checksum-identified file for a
+request's `iers` block (sub-arcsecond effect on apparent/site products;
+never required — without it, astropy's bundled tables are used and
+identified in provenance). The `jpl_file` adapter needs the `jpl` extra:
+`uv sync --extra jpl` or `pip install 'sglseti[jpl]'`.
 
 ## Development
 

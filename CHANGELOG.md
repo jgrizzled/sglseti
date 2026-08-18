@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0rc2] - 2026-08-17
+
+Fixes for the scientific accuracy review.
+`RESULT_SCHEMA_VERSION` bumped to 2 (new sample/pointing/visibility
+columns); `tusay2022_eq5_7_v1` model version bumped to 1.1.0 (validity
+semantics changed; directions unchanged).
+
+### Changed
+
+- The focal-distance check uses the finite-source photospheric threshold
+  `z_min = f_inf·d/(d − f_inf)` instead of the source-at-infinity constant,
+  and samples below it are `degraded`, not silently valid (review finding
+  4; `solar_focal_min_au()` exported). The threshold remains ideal and
+  geometric — practical observing limits lie farther out.
+- Visibility verdicts also probe the corridor's angular extreme points
+  (reported values stay the representative sample's), and pointing radii
+  gained a `window_drift_arcsec` component bounding the group's motion
+  across the advertised window's grid epochs (review finding 5).
+- The paper's `z > d/10` probe-placement restriction is reported as a
+  search prior, not model invalidity (review finding 6): such samples are
+  now `degraded` with `outside_search_prior` (previously `invalid` with
+  `relay_beyond_model_bound`), remain consumable, and any pointing built
+  from them — or from below-focal samples — carries the condition code.
+  `invalid` is reserved for uninterpretable results.
+
+- Validity is now the authoritative gate for observing products (review
+  finding 1): planning, visibility, and DS9 export consume only
+  operational samples (`LocusSample.is_operational`), so a
+  finite-but-invalid coordinate (e.g. beyond the `z > d/10` bound) can no
+  longer enter a pointing, window, or region file; tabular exports keep
+  such rows, labeled, as the diagnostic channel.
+- Pointing footprints now cover the relay-distance intervals their samples
+  represent (review finding 2): samples carry segment bounds
+  (`z_near_au`/`z_far_au`, `q_lo_per_au`/`q_hi_per_au`), boundary
+  geometric-ICRS coordinates, and near-boundary rates; the planner's zone
+  center/extent/motion padding include those boundaries, and pointings
+  state their covered interval (`z_near_au`/`z_far_au`).
+- The IERS-A Earth-orientation table is a first-class pinned resource
+  (review finding 3): `sglseti fetch iers --output-dir …` downloads it
+  atomically with reported checksum and coverage; a request `iers` block
+  installs that exact table via astropy's `earth_orientation_table`
+  context. AltAz/CIRS transform warnings are captured into sample and
+  visibility warnings (new `VisibilitySample.warnings`) with validity
+  degraded — never silent; the resolved IERS identity
+  (`iers_a:sha256:…`/`iers_bundled:…`) enters the calculation ID and
+  manifest for requests with apparent or site products, and
+  `astropy-iers-data` joined the recorded versions.
+
 ## [1.0.0rc1] - 2026-08-17
 
 Release candidate for v1. All PRD v1 functionality is implemented and
@@ -89,7 +137,7 @@ boundary).
   registry loading with normalized source hash and missing-radial-velocity
   policy (`sglseti.targets`), request schema v1 with exactly one time mode
   and strict-UTC ECSV/CSV epoch tables (`sglseti.config`), `sglseti validate
-  targets|request` CLI commands, lazy top-level re-exports, and the
+targets|request` CLI commands, lazy top-level re-exports, and the
   historical/commensal example inputs.
 - Package scaffold: installable `sglseti` package with `pyproject.toml`,
   `sglseti` console script, domain-error CLI boundary, typed-package marker,

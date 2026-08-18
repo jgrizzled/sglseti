@@ -14,10 +14,12 @@ ADR-0001):
 - the relay locus is ``P = S(t_o) - z * a(u_role)`` and the line of sight is
   ``unit(P - O(t_o))``, both in barycentric ICRS (Tusay et al. 2022 eq. 5
   with the role-corrected direction);
-- validity: ``z > d/10`` is invalid (published model bound); ``z`` below the
-  solar focal minimum, propagation spans beyond ±75 yr, and a flagged
-  missing radial velocity (propagated as zero, never silently) degrade with
-  machine-readable warning codes.
+- validity: ``z > d/10`` (the paper's probe-placement search prior, not a
+  derived bound), ``z`` below the finite-source solar focal threshold,
+  propagation spans beyond ±75 yr, and a flagged missing radial velocity
+  (propagated as zero, never silently) all degrade with machine-readable
+  warning codes; ``invalid`` is reserved for results that cannot be
+  interpreted at all (e.g. ephemeris out of coverage).
 
 The observer's barycentric position is the ephemeris Earth barycenter plus
 the site's GCRS position vector treated as an ICRS-axis offset (< 1 mas
@@ -33,7 +35,7 @@ from __future__ import annotations
 import math
 import warnings as _warnings
 from dataclasses import dataclass
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
 from astropy import units as u
@@ -59,9 +61,13 @@ from .models import (
 
 __all__ = [
     "C_AU_PER_DAY",
+    "WARN_BELOW_FOCAL",
+    "WARN_LONG_SPAN",
+    "WARN_MISSING_RV",
+    "WARN_OUTSIDE_SEARCH_PRIOR",
     "PROPAGATION_SPAN_WARN_YEARS",
     "SOLAR_FOCAL_MIN_AU",
-    "Z_OVER_D_INVALID_FRACTION",
+    "Z_OVER_D_SEARCH_PRIOR_FRACTION",
     "GeometryModel",
     "MotionRates",
     "RelaySolution",
@@ -71,24 +77,51 @@ __all__ = [
     "compute_relay_solution",
     "motion_rates",
     "observer_barycentric_au",
+    "solar_focal_min_au",
 ]
 
 #: Speed of light in AU/day from defining constants (matches the fixtures).
 C_AU_PER_DAY = 299_792_458 * 86_400 / 149_597_870_700
 
-#: Solar minimum focal distance (tests/data/reference/solar_focal_distance.yaml).
+#: Ideal photospheric solar focal distance for a source at INFINITY
+#: (tests/data/reference/solar_focal_distance.yaml). For a finite source
+#: use :func:`solar_focal_min_au`. Practical radio/optical observing limits
+#: lie farther out (solar atmosphere, corona, wavelength, impact parameter).
 SOLAR_FOCAL_MIN_AU = 547.7575534823646
 
-#: Tusay et al. restrict probe placement to a tenth of the Sun-star distance.
-Z_OVER_D_INVALID_FRACTION = 0.1
+#: Tusay et al. restrict their probe-placement SEARCH to a tenth of the
+#: Sun-star distance. It is a study prior controlling the rho = z light-time
+#: approximation error, not a derived singularity of equations 5-7: beyond
+#: it the equations remain evaluable and results are reported ``degraded``
+#: with ``outside_search_prior``, never ``invalid``.
+Z_OVER_D_SEARCH_PRIOR_FRACTION = 0.1
 
 #: Preliminary linear-motion validity bound (geometry_models.md §5).
 PROPAGATION_SPAN_WARN_YEARS = 75.0
 
-_WARN_BELOW_FOCAL = "below_solar_focal_minimum"
-_WARN_LONG_SPAN = "long_propagation_span"
-_WARN_MISSING_RV = "missing_radial_velocity"
-_WARN_Z_BEYOND_BOUND = "relay_beyond_model_bound"
+WARN_BELOW_FOCAL = "below_solar_focal_minimum"
+WARN_LONG_SPAN = "long_propagation_span"
+WARN_MISSING_RV = "missing_radial_velocity"
+WARN_OUTSIDE_SEARCH_PRIOR = "outside_search_prior"
+
+
+def solar_focal_min_au(target_distance_au: float) -> float:
+    """Minimum lensing distance for a source at finite distance ``d``.
+
+    The effective lensing distance of an observer at ``z`` for a source at
+    ``d`` is ``z_eff = z d / (z + d)``; requiring ``z_eff >= f_inf`` gives
+    ``z_min = f_inf d / (d - f_inf)`` (Turyshev & Toth finite-distance
+    formulation). This is the ideal photospheric/geometric threshold —
+    practical observing limits are farther out. A source at or inside the
+    infinite-source focal distance can never satisfy it (returns ``inf``).
+    """
+    if target_distance_au <= SOLAR_FOCAL_MIN_AU:
+        return math.inf
+    return (
+        SOLAR_FOCAL_MIN_AU
+        * target_distance_au
+        / (target_distance_au - SOLAR_FOCAL_MIN_AU)
+    )
 
 
 @runtime_checkable
@@ -143,10 +176,15 @@ class MotionRates:
 
 
 class Tusay2022Eq57V1:
-    """The reviewed v1 role model (Tusay et al. 2022 eqs. 5-7)."""
+    """The reviewed v1 role model (Tusay et al. 2022 eqs. 5-7).
+
+    1.1.0: finite-source focal threshold (below it degrades validity) and
+    ``z > d/10`` reclassified from ``invalid`` to a degraded search-prior
+    condition (``outside_search_prior``). Directions are unchanged.
+    """
 
     model_id = "tusay2022_eq5_7_v1"
-    model_version = "1.0.0"
+    model_version = "1.1.0"
 
     def target_direction(
         self,
@@ -202,17 +240,24 @@ class Tusay2022Eq57V1:
             warnings.extend(f"astropy:{w.message}" for w in caught)
 
         validity = Validity.VALID
-        if any(w == _WARN_MISSING_RV for w in warnings):
+        if any(w == WARN_MISSING_RV for w in warnings):
             validity = Validity.DEGRADED
-        if z_au < SOLAR_FOCAL_MIN_AU:
-            warnings.append(_WARN_BELOW_FOCAL)
+        # Finite-source photospheric threshold (finding 4): below it the
+        # geometry is still computable but the Sun cannot focus this
+        # source's light there, so the sample is degraded for SGL use.
+        if z_au < solar_focal_min_au(d_au):
+            warnings.append(WARN_BELOW_FOCAL)
+            validity = Validity.DEGRADED if validity is Validity.VALID else validity
         span_years = abs((catalog_epoch - catalog.obstime.tdb).to_value(u.yr))
         if span_years > PROPAGATION_SPAN_WARN_YEARS:
-            warnings.append(_WARN_LONG_SPAN)
+            warnings.append(WARN_LONG_SPAN)
             validity = Validity.DEGRADED if validity is Validity.VALID else validity
-        if z_au > Z_OVER_D_INVALID_FRACTION * d_au:
-            warnings.append(_WARN_Z_BEYOND_BOUND)
-            validity = Validity.INVALID
+        # Study search prior, not a physical bound (finding 6): the result
+        # stays consumable, visibly outside the reviewed approximation
+        # domain. ``invalid`` is reserved for uninterpretable results.
+        if z_au > Z_OVER_D_SEARCH_PRIOR_FRACTION * d_au:
+            warnings.append(WARN_OUTSIDE_SEARCH_PRIOR)
+            validity = Validity.DEGRADED if validity is Validity.VALID else validity
 
         return DirectionSolution(
             model_id=self.model_id,
@@ -248,7 +293,7 @@ def _catalog_coord(target: Target, warnings: list[str]) -> SkyCoord:
         distance = Distance(state.distance_pc * u.pc)
     radial_velocity = state.radial_velocity_km_s
     if radial_velocity is None:
-        warnings.append(_WARN_MISSING_RV)
+        warnings.append(WARN_MISSING_RV)
         radial_velocity = 0.0
     reference_epoch = Time(
         state.reference_epoch_jyear,
@@ -365,30 +410,35 @@ def _site_location(observer: Observer) -> EarthLocation:
     )
 
 
-def cirs_apparent(solution: RelaySolution) -> tuple[float, float]:
+def cirs_apparent(
+    solution: RelaySolution, *, iers_table: Any | None = None
+) -> tuple[float, float]:
     """Apparent CIRS RA/Dec of the relay for the solution's observer.
 
     Topocentric CIRS for a site observer, geocentric for Earth center. The
     transform is astropy's full barycentric-cartesian path (parallax and
     aberration handled by the frame machinery), labeled apparent-approximate
-    per the model documentation.
+    per the model documentation. ``iers_table`` installs a pinned
+    Earth-orientation table for the transform.
     """
     location = (
         None
         if solution.observer.kind is ObserverKind.EARTH_CENTER
         else _site_location(solution.observer)
     )
-    with offline_resources():
+    with offline_resources(iers_table=iers_table):
         cirs = _relay_skycoord(solution).transform_to(
             CIRS(obstime=solution.observation_time, location=location)
         )
     return float(cirs.ra.deg), float(cirs.dec.deg)
 
 
-def altaz_apparent(solution: RelaySolution) -> tuple[float, float]:
+def altaz_apparent(
+    solution: RelaySolution, *, iers_table: Any | None = None
+) -> tuple[float, float]:
     """Apparent altitude/azimuth of the relay (refraction disabled)."""
     location = _site_location(solution.observer)
-    with offline_resources():
+    with offline_resources(iers_table=iers_table):
         altaz = _relay_skycoord(solution).transform_to(
             AltAz(obstime=solution.observation_time, location=location)
         )

@@ -12,20 +12,36 @@ while the conservative zone still fits the usable field radius. The zone
 radius keeps its components separate:
 
     radius = track_extent + assumed_half_width + motion_padding
+             + window_drift
 
 where ``track_extent`` is the maximal angular distance from the zone center
-(spherical midpoint of the group's endpoints) to any grouped sample,
+(spherical midpoint of the group's extreme interval boundaries) to any
+covered point — each sample's representative coordinate and its segment's
+near/far boundary coordinates, so the footprint covers the relay-distance
+*intervals* the samples represent, not just their midpoints —
 ``assumed_half_width`` is the request's explicitly assumed corridor
 half-width (never covariance), and ``motion_padding`` is half an exposure of
-the fastest grouped sample's angular rate (only when ``fov.exposure_s`` is
-configured). A group that exceeds the usable radius even as a single
-segment is still emitted, flagged ``group_exceeds_usable_fov`` — pointings
-are candidate zones, and hiding the segment would misstate coverage of the
-hypothesis space.
+the fastest covered rate (representative and near-boundary rates; the near
+boundary is the interval's fastest point; only when ``fov.exposure_s`` is
+configured), and ``window_drift`` is the extra extent the grouped segments
+sweep across the advertised window's grid epochs beyond the
+representative-epoch track — the pointing covers the window it advertises,
+not just one instant. Endpoint coverage suffices for this model because the
+corridor is the sky projection of a near-straight ray: direction moves
+monotonically along its arc with z, and each segment's interior
+representative is evaluated as well. A group that exceeds the usable radius
+even as a single segment is still emitted, flagged
+``group_exceeds_usable_fov`` — pointings are candidate zones, and hiding
+the segment would misstate coverage of the hypothesis space.
 
-Visibility for a corridor is evaluated at its middle segment's line of
-sight (documented convention; corridor angular extent is small against the
-constraint scales).
+Visibility for a corridor reports the middle operational segment's line of
+sight, while its pass/fail verdict also probes the corridor's angular
+extreme points, so an endpoint cannot silently fail a threshold the middle
+sample meets. Samples whose ``validity`` is invalid never enter visibility,
+grouping, or pointings, even when they carry finite diagnostic coordinates;
+degraded conditions (``below_solar_focal_minimum``,
+``outside_search_prior``) stay consumable and are surfaced on any pointing
+built from them.
 """
 
 from __future__ import annotations
@@ -33,15 +49,17 @@ from __future__ import annotations
 import dataclasses
 import math
 
-from .ephemeris import AstropyEphemeris, Ephemeris
+from .ephemeris import AstropyEphemeris, Ephemeris, IersResource
 from .errors import PlanningError
 from .generate import materialize_epochs
+from .geometry import WARN_BELOW_FOCAL, WARN_OUTSIDE_SEARCH_PRIOR
 from .models import (
     CalculationResult,
     Corridor,
     LocusSample,
     ObserverKind,
     Pointing,
+    Role,
     VisibilitySample,
 )
 from .observability import VisibilityWindow, find_windows, visibility_sample
@@ -50,12 +68,14 @@ from .targets import TargetRegistry
 
 __all__ = [
     "WARN_GROUP_EXCEEDS_FOV",
+    "WARN_NO_OPERATIONAL_SAMPLES",
     "WARN_NO_VISIBLE_WINDOW",
     "group_corridor_samples",
     "plan_commensal",
 ]
 
 WARN_GROUP_EXCEEDS_FOV = "group_exceeds_usable_fov"
+WARN_NO_OPERATIONAL_SAMPLES = "no_operational_samples"
 WARN_NO_VISIBLE_WINDOW = "no_visible_window"
 
 _ARCSEC = 3600.0
@@ -98,14 +118,28 @@ class _Zone:
     radius_arcsec: float
 
 
+def _boundary_or_rep(
+    sample: LocusSample, ra: float | None, dec: float | None
+) -> tuple[float, float]:
+    if ra is not None and dec is not None and math.isfinite(ra) and math.isfinite(dec):
+        return ra, dec
+    return sample.icrs_ra_deg, sample.icrs_dec_deg
+
+
 def _zone_for(
     samples: tuple[LocusSample, ...],
     assumed_half_width_arcsec: float | None,
     exposure_s: float | None,
 ) -> _Zone:
+    # The corridor is ordered by ascending z, so the group's true sky
+    # extremes are the first sample's near boundary and the last sample's
+    # far boundary; center on those, and require the footprint to contain
+    # every represented interval boundary, not just representative points.
     first, last = samples[0], samples[-1]
-    v_first = _unit(first.icrs_ra_deg, first.icrs_dec_deg)
-    v_last = _unit(last.icrs_ra_deg, last.icrs_dec_deg)
+    near_end = _boundary_or_rep(first, first.near_icrs_ra_deg, first.near_icrs_dec_deg)
+    far_end = _boundary_or_rep(last, last.far_icrs_ra_deg, last.far_icrs_dec_deg)
+    v_first = _unit(*near_end)
+    v_last = _unit(*far_end)
     center = _radec(
         (
             v_first[0] + v_last[0],
@@ -114,8 +148,9 @@ def _zone_for(
         )
     )
     extent = max(
-        _separation_arcsec(center[0], center[1], s.icrs_ra_deg, s.icrs_dec_deg)
+        _separation_arcsec(center[0], center[1], ra, dec)
         for s in samples
+        for ra, dec in s.coverage_radec()
     )
     padding = 0.0
     if exposure_s is not None:
@@ -124,6 +159,16 @@ def _zone_for(
                 s.rate_ra_cosdec_arcsec_per_hr or 0.0, s.rate_dec_arcsec_per_hr or 0.0
             )
             for s in samples
+        )
+        fastest = max(
+            fastest,
+            max(
+                math.hypot(
+                    s.near_rate_ra_cosdec_arcsec_per_hr or 0.0,
+                    s.near_rate_dec_arcsec_per_hr or 0.0,
+                )
+                for s in samples
+            ),
         )
         padding = fastest * (exposure_s / 3600.0) / 2.0
     radius = extent + (assumed_half_width_arcsec or 0.0) + padding
@@ -134,6 +179,11 @@ def _zone_for(
         motion_padding_arcsec=padding,
         radius_arcsec=radius,
     )
+
+
+def _operational_samples(corridor: Corridor) -> tuple[LocusSample, ...]:
+    """Samples eligible for observing products; validity is the gate."""
+    return tuple(s for s in corridor.samples if s.is_operational)
 
 
 def group_corridor_samples(
@@ -182,6 +232,7 @@ def plan_commensal(
         raise PlanningError("commensal planning requires a request fov block")
     if ephemeris is None:
         ephemeris = AstropyEphemeris(request.ephemeris)
+    iers = IersResource(request.iers) if request.iers is not None else None
 
     epochs = materialize_epochs(request.time)
     corridor_index: dict[tuple[str, str, str], Corridor] = {
@@ -198,7 +249,14 @@ def plan_commensal(
             role_visibility: list[VisibilitySample] = []
             for epoch in epochs:
                 corridor = corridor_index[(target_id, role.value, epoch.epoch_id)]
-                representative = corridor.samples[len(corridor.samples) // 2]
+                operational = _operational_samples(corridor)
+                # With no operational sample, the corridor middle stands in and
+                # visibility_sample fails it as sample_invalid — no window forms.
+                representative = (
+                    operational[len(operational) // 2]
+                    if operational
+                    else corridor.samples[len(corridor.samples) // 2]
+                )
                 role_visibility.append(
                     visibility_sample(
                         sample=representative,
@@ -206,6 +264,8 @@ def plan_commensal(
                         observer=request.observer,
                         ephemeris=ephemeris,
                         constraints=request.observability,
+                        iers=iers,
+                        probe_points=_corridor_extremes(operational),
                     )
                 )
             visibility.extend(role_visibility)
@@ -224,8 +284,14 @@ def plan_commensal(
                 corridor = corridor_index[
                     (target_id, role.value, window.representative_epoch_id)
                 ]
+                operational = _operational_samples(corridor)
+                if not operational:
+                    planning_warnings.append(
+                        f"{WARN_NO_OPERATIONAL_SAMPLES}:{target_id}/{role.value}"
+                    )
+                    continue
                 groups = group_corridor_samples(
-                    corridor.samples,
+                    operational,
                     usable_radius_arcsec=request.fov.radius_arcsec,
                     assumed_half_width_arcsec=request.assumed_half_width_arcsec,
                     exposure_s=request.fov.exposure_s,
@@ -239,6 +305,14 @@ def plan_commensal(
                         zone=zone,
                         usable_radius_arcsec=request.fov.radius_arcsec,
                         assumed_half_width_arcsec=request.assumed_half_width_arcsec,
+                        window_drift_arcsec=_window_drift_arcsec(
+                            corridor_index=corridor_index,
+                            target_id=target_id,
+                            role=role,
+                            window=window,
+                            group=group,
+                            zone=zone,
+                        ),
                     )
                     ordered_pointings.append(
                         (
@@ -256,6 +330,66 @@ def plan_commensal(
     )
 
 
+def _corridor_extremes(
+    operational: tuple[LocusSample, ...],
+) -> tuple[tuple[float, float], ...]:
+    """The corridor's angular extreme points, for worst-case visibility.
+
+    The first operational sample's near boundary and the last one's far
+    boundary bound the corridor arc (the model direction is monotonic in z
+    along it), so evaluating constraints there catches an endpoint failing
+    a threshold the middle sample meets.
+    """
+    if not operational:
+        return ()
+    first, last = operational[0], operational[-1]
+    return (
+        _boundary_or_rep(first, first.near_icrs_ra_deg, first.near_icrs_dec_deg),
+        _boundary_or_rep(last, last.far_icrs_ra_deg, last.far_icrs_dec_deg),
+    )
+
+
+def _window_drift_arcsec(
+    *,
+    corridor_index: dict[tuple[str, str, str], Corridor],
+    target_id: str,
+    role: Role,
+    window: VisibilityWindow,
+    group: tuple[LocusSample, ...],
+    zone: _Zone,
+) -> float:
+    """Extra extent the group sweeps across the window's grid epochs.
+
+    The pointing is constructed at the window's representative epoch, but
+    it advertises the whole window; the same relay segments at every other
+    window epoch (already generated) bound the positional drift, so the
+    radius covers the window, not just one instant. Grid-sampled like the
+    window itself.
+    """
+    group_ids = {sample.sample_id for sample in group}
+    max_extent = zone.track_extent_arcsec
+    for epoch_id in window.epoch_ids:
+        corridor = corridor_index.get((target_id, role.value, epoch_id))
+        if corridor is None:
+            continue
+        for sample in corridor.samples:
+            if sample.sample_id not in group_ids or not sample.is_operational:
+                continue
+            for ra, dec in sample.coverage_radec():
+                max_extent = max(
+                    max_extent,
+                    _separation_arcsec(
+                        zone.center_ra_deg, zone.center_dec_deg, ra, dec
+                    ),
+                )
+    return max_extent - zone.track_extent_arcsec
+
+
+#: Sample condition codes surfaced on any pointing built from them, so a
+#: product consumer sees them without joining back to the samples table.
+_PROPAGATED_SAMPLE_CONDITIONS = (WARN_BELOW_FOCAL, WARN_OUTSIDE_SEARCH_PRIOR)
+
+
 def _build_pointing(
     *,
     result: CalculationResult,
@@ -265,10 +399,17 @@ def _build_pointing(
     zone: _Zone,
     usable_radius_arcsec: float,
     assumed_half_width_arcsec: float | None,
+    window_drift_arcsec: float,
 ) -> Pointing:
-    warnings: tuple[str, ...] = ()
-    if zone.radius_arcsec > usable_radius_arcsec:
-        warnings = (WARN_GROUP_EXCEEDS_FOV,)
+    radius_arcsec = zone.radius_arcsec + window_drift_arcsec
+    warning_list: list[str] = []
+    if radius_arcsec > usable_radius_arcsec:
+        warning_list.append(WARN_GROUP_EXCEEDS_FOV)
+    group_codes = {code for sample in group for code in sample.warnings}
+    warning_list.extend(
+        code for code in _PROPAGATED_SAMPLE_CONDITIONS if code in group_codes
+    )
+    warnings = tuple(warning_list)
     sample_ids = tuple(sample.sample_id for sample in group)
     pointing_id = stable_id(
         "pnt",
@@ -290,7 +431,7 @@ def _build_pointing(
         sample_ids=sample_ids,
         center_icrs_ra_deg=zone.center_ra_deg,
         center_icrs_dec_deg=zone.center_dec_deg,
-        radius_arcsec=zone.radius_arcsec,
+        radius_arcsec=radius_arcsec,
         usable_radius_arcsec=usable_radius_arcsec,
         representative_time_utc=window.representative_utc,
         window_start_utc=window.start_utc,
@@ -299,4 +440,7 @@ def _build_pointing(
         track_extent_arcsec=zone.track_extent_arcsec,
         assumed_half_width_arcsec=assumed_half_width_arcsec,
         motion_padding_arcsec=zone.motion_padding_arcsec,
+        z_near_au=group[0].z_near_au,
+        z_far_au=group[-1].z_far_au,
+        window_drift_arcsec=window_drift_arcsec,
     )

@@ -27,6 +27,16 @@ What sglseti v1 does **not** do, and where its numbers stop being trustworthy.
 - A missing radial velocity is either a load error or an explicit
   degraded-status propagation with RV = 0 — perspective effects are then
   unmodeled.
+- **The focal threshold is ideal and geometric.** The finite-source
+  photospheric threshold `z_min = f_inf·d/(d − f_inf)` marks where the Sun
+  can focus the target's light at all; practical radio/optical observing
+  limits lie farther out (solar atmosphere, corona, wavelength, required
+  impact parameter) and are not modeled.
+- **`z > d/10` is a search prior, not a physical bound.** It reproduces
+  the Tusay et al. probe-placement restriction that controls the ρ ≈ z
+  approximation error; beyond it results are `degraded`
+  (`outside_search_prior`), and no independent error model replaces the
+  prior.
 
 ## Product boundary
 
@@ -47,7 +57,10 @@ What sglseti v1 does **not** do, and where its numbers stop being trustworthy.
 ## Operational
 
 - Grids are sampled: windows and representative times are only as fine as
-  the requested cadence.
+  the requested cadence, and constraint crossings between grid points are
+  not solved for. Within a grid epoch, visibility does probe the corridor's
+  angular extremes, and pointing radii include the drift envelope across
+  the advertised window's grid epochs.
 - The committed test kernel excerpt covers 2010–2035; full DE440s covers
   1849–2150. Epochs outside your kernel produce invalid rows by design.
 - Performance is laptop-scale by requirement (see

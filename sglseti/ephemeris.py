@@ -7,7 +7,9 @@ astropy-backed implementation. Resource policy is explicit and scoped:
   kernel files work offline, and :func:`offline_resources` scopes astropy's
   IERS auto-download off for the duration of a calculation instead of
   mutating process-global state (the prototype's ``iers.conf`` mutation is
-  deliberately not ported);
+  deliberately not ported); a pinned :class:`IersResource` table is
+  installed the same scoped way, and degraded Earth-orientation accuracy is
+  forced to warn so callers can capture it into product validity;
 - file-backed resources are identified by content checksum, never by path;
 - epochs outside a kernel's coverage raise
   :class:`~sglseti.errors.EphemerisCoverageError` — an invalid status, never
@@ -22,7 +24,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from .errors import EphemerisCoverageError, EphemerisError
-from .models import EphemerisAdapter, EphemerisSpec
+from .models import EphemerisAdapter, EphemerisSpec, IersSpec
 from .provenance import file_sha256
 
 if TYPE_CHECKING:
@@ -30,25 +32,99 @@ if TYPE_CHECKING:
     from astropy.time import Time
 
 __all__ = [
+    "WARN_IERS_COVERAGE",
     "AstropyEphemeris",
     "Ephemeris",
+    "IersResource",
+    "bundled_iers_id",
     "offline_resources",
 ]
 
+#: Warning code attached to apparent/site products computed at an epoch
+#: outside a pinned IERS table's tabulated range.
+WARN_IERS_COVERAGE = "iers_out_of_coverage"
+
 
 @contextlib.contextmanager
-def offline_resources() -> Iterator[None]:
+def offline_resources(iers_table: Any | None = None) -> Iterator[None]:
     """Scoped offline policy for astropy resources.
 
-    Inside the context, IERS auto-download is disabled; astropy falls back to
-    its bundled tables (degraded-accuracy warnings are legitimate results,
-    not errors). The previous configuration is restored on exit — no
-    process-global mutation leaks.
+    Inside the context, IERS auto-download is disabled and degraded
+    Earth-orientation accuracy is forced to warn (never raise, never pass
+    silently) so callers can capture the warnings into product validity.
+    When ``iers_table`` is given (an :class:`IersResource` table), it is
+    installed explicitly via astropy's ``earth_orientation_table`` context —
+    the pinned file is *used*, not merely cached; otherwise astropy's
+    bundled tables apply. The previous configuration is restored on exit —
+    no process-global mutation leaks.
     """
     from astropy.utils import iers
 
-    with iers.conf.set_temp("auto_download", False):
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(iers.conf.set_temp("auto_download", False))
+        stack.enter_context(iers.conf.set_temp("iers_degraded_accuracy", "warn"))
+        if iers_table is not None:
+            stack.enter_context(iers.earth_orientation_table.set(iers_table))
         yield
+
+
+def bundled_iers_id() -> str:
+    """Identity of astropy's bundled Earth-orientation tables."""
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        bundled_version = version("astropy-iers-data")
+    except PackageNotFoundError:  # pragma: no cover
+        bundled_version = "unknown"
+    return f"iers_bundled:astropy-iers-data=={bundled_version}"
+
+
+class IersResource:
+    """A pinned IERS-A table: content identity, coverage, loaded table.
+
+    Mirrors the file-backed ephemeris policy: the file is identified by
+    SHA-256 (an optional spec checksum makes a mismatch a hard error), its
+    coverage bounds are parsed up front, and the loaded table is installed
+    per calculation through :func:`offline_resources`.
+    """
+
+    def __init__(self, spec: IersSpec) -> None:
+        self.spec = spec
+        path = Path(spec.path)
+        if not path.is_file():
+            raise EphemerisError(f"IERS table not found: {path}")
+        checksum = file_sha256(path)
+        if spec.checksum_sha256 is not None and spec.checksum_sha256 != checksum:
+            raise EphemerisError(
+                f"IERS table checksum mismatch for {path.name}: "
+                f"expected {spec.checksum_sha256}, got {checksum}"
+            )
+        from astropy.utils import iers
+
+        try:
+            self.table = iers.IERS_A.open(str(path))
+            mjd = self.table["MJD"]
+            low, high = mjd.min(), mjd.max()
+            self.coverage_mjd = (
+                float(getattr(low, "value", low)),
+                float(getattr(high, "value", high)),
+            )
+        except EphemerisError:
+            raise
+        except Exception as exc:
+            raise EphemerisError(
+                f"failed to parse IERS-A table {path.name}: {exc}"
+            ) from exc
+        self._id = f"iers_a:{checksum}"
+
+    @property
+    def iers_id(self) -> str:
+        return self._id
+
+    def covers(self, time: Time) -> bool:
+        """Whether ``time`` lies inside the table's tabulated MJD range."""
+        mjd = float(time.utc.mjd)
+        return self.coverage_mjd[0] <= mjd <= self.coverage_mjd[1]
 
 
 @runtime_checkable

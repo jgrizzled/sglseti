@@ -38,15 +38,34 @@ Requires the `jpl` extra (`jplephem`): `uv sync --extra jpl` or
 
 ## Earth orientation (IERS)
 
-Offline runs use astropy's bundled IERS-B tables; sglseti scopes
-auto-download off during every calculation (no global configuration is
-touched). The effect of stale tables on sglseti products is at the
-milliarcsecond level — far below the model's ~0.1″ floor. To refresh
-predictions explicitly:
+Earth-orientation data affects only apparent (CIRS/AltAz) and
+site-visibility products; geometric ICRS never depends on it. It follows
+the same pinned-resource policy as kernels:
 
 ```bash
-sglseti fetch iers
+sglseti fetch iers --output-dir resources/
+# prints the file's sha256 and coverage dates, plus the request snippet:
+#   iers:
+#     path: resources/finals2000A.all
+#     checksum_sha256: sha256:…
 ```
+
+A request's `iers` block installs that exact table for its calculations via
+astropy's `earth_orientation_table` context — never cache discovery. The
+table is republished weekly, so no checksum is pinned in the fetch registry;
+pin the reported one in the request to freeze a run. Without an `iers`
+block, astropy's bundled tables are used and identified by the
+`astropy-iers-data` package version.
+
+Either way the resolved identity (`iers_a:sha256:…` or
+`iers_bundled:astropy-iers-data==…`) enters the calculation ID and manifest
+whenever the request has apparent or site products — purely geometric IDs
+never churn with Earth-orientation releases. Transforms at epochs outside
+Earth-orientation coverage are labeled, never silent: captured astropy
+warnings (and `iers_out_of_coverage` for a pinned table) degrade the
+affected sample's validity, and visibility rows carry the same warnings.
+The effect of stale tables is sub-arcsecond — real, but far below the
+degree-scale margins of visibility constraints.
 
 ## Offline verification
 

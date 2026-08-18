@@ -26,9 +26,10 @@ from .errors import EphemerisError
 __all__ = [
     "KNOWN_KERNELS",
     "FetchResult",
+    "IersFetchResult",
     "KernelInfo",
+    "fetch_iers",
     "fetch_kernel",
-    "refresh_iers",
 ]
 
 _DOWNLOAD_TIMEOUT_S = 120
@@ -105,6 +106,13 @@ def fetch_kernel(
         source_url = url
         pinned = expected_sha256
 
+    return _download_atomic(source_url, output_dir, pinned=pinned)
+
+
+def _download_atomic(
+    source_url: str, output_dir: str | Path, *, pinned: str | None
+) -> FetchResult:
+    """Atomic checksum-verified download shared by all resource fetchers."""
     filename = Path(urllib.parse.urlparse(source_url).path).name
     if not filename:
         raise EphemerisError(f"cannot derive a filename from URL {source_url!r}")
@@ -136,17 +144,45 @@ def fetch_kernel(
     return FetchResult(path=destination, sha256=checksum, source_url=source_url)
 
 
-def refresh_iers() -> str:
-    """Refresh astropy's cached IERS-A Earth-orientation table.
+@dataclass(frozen=True)
+class IersFetchResult:
+    path: Path
+    sha256: str
+    source_url: str
+    coverage_start_utc: str
+    coverage_end_utc: str
 
-    Improves UT1 predictions at the sub-arcsecond level; calculations work
-    without it using astropy's bundled tables.
+
+def fetch_iers(output_dir: str | Path, *, url: str | None = None) -> IersFetchResult:
+    """Download the IERS-A Earth-orientation table to a pinned local file.
+
+    The table becomes an explicit, checksum-identified resource that a
+    request's ``iers`` block installs for its calculations — never a hidden
+    astropy cache entry. No checksum can be pinned in advance (the table is
+    republished weekly), so the computed SHA-256 is always reported; pin it
+    in the request spec to freeze the run. The parsed coverage bounds are
+    returned so staleness is visible at fetch time.
     """
     from astropy.utils import iers
-    from astropy.utils.data import download_file
 
+    result = _download_atomic(url or iers.IERS_A_URL, output_dir, pinned=None)
     try:
-        path = download_file(iers.IERS_A_URL, cache="update")
+        table = iers.IERS_A.open(str(result.path))
+        from astropy.time import Time
+
+        mjd = table["MJD"]
+        low, high = mjd.min(), mjd.max()
+        start = Time(float(getattr(low, "value", low)), format="mjd", scale="utc")
+        end = Time(float(getattr(high, "value", high)), format="mjd", scale="utc")
     except Exception as exc:
-        raise EphemerisError(f"failed to refresh IERS-A data: {exc}") from exc
-    return str(path)
+        result.path.unlink(missing_ok=True)
+        raise EphemerisError(
+            f"downloaded IERS-A table is unreadable ({exc}); file discarded"
+        ) from exc
+    return IersFetchResult(
+        path=result.path,
+        sha256=result.sha256,
+        source_url=result.source_url,
+        coverage_start_utc=str(start.iso),
+        coverage_end_utc=str(end.iso),
+    )

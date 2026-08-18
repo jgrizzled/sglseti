@@ -344,6 +344,27 @@ class EphemerisSpec:
             raise ValueError("ephemeris adapter astropy_builtin does not take a path")
 
 
+@dataclass(frozen=True)
+class IersSpec:
+    """A pinned local IERS-A Earth-orientation table for apparent products.
+
+    The file is installed explicitly for the calculation (astropy's
+    ``earth_orientation_table`` context) and identified by content checksum,
+    never by path — the same policy as file-backed ephemerides. Without a
+    spec, astropy's bundled tables are used and identified by the
+    ``astropy-iers-data`` package version. Only apparent (CIRS/AltAz) and
+    site-visibility products depend on this resource; geometric ICRS never
+    does.
+    """
+
+    path: str
+    checksum_sha256: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.path:
+            raise ValueError("iers spec requires a path")
+
+
 @dataclass(frozen=True, init=False)
 class RelayRange:
     """Heliocentric relay-distance interval, stored in AU.
@@ -587,6 +608,7 @@ class GeometryRequest:
     model_id: str
     model_parameters: Mapping[str, str | int | float | bool] = field(default_factory=dict)
     ephemeris: EphemerisSpec = field(default_factory=EphemerisSpec)
+    iers: IersSpec | None = None
     coordinate_products: tuple[CoordinateProduct, ...] = (CoordinateProduct.ICRS,)
     include_rates: bool = False
     output_formats: tuple[OutputFormat, ...] = (OutputFormat.ECSV, OutputFormat.JSON)
@@ -761,6 +783,54 @@ class LocusSample:
     # optional motion
     rate_ra_cosdec_arcsec_per_hr: float | None = None
     rate_dec_arcsec_per_hr: float | None = None
+    # represented relay-distance interval (segment bounds; near == far for
+    # explicit point segments)
+    z_near_au: float | None = None
+    z_far_au: float | None = None
+    q_lo_per_au: float | None = None
+    q_hi_per_au: float | None = None
+    # geometric ICRS at the interval boundaries — the coverage extremes a
+    # pointing footprint must contain, not just the representative point
+    near_icrs_ra_deg: float | None = None
+    near_icrs_dec_deg: float | None = None
+    far_icrs_ra_deg: float | None = None
+    far_icrs_dec_deg: float | None = None
+    # motion rates at the near boundary, the interval's fastest point
+    near_rate_ra_cosdec_arcsec_per_hr: float | None = None
+    near_rate_dec_arcsec_per_hr: float | None = None
+
+    def coverage_radec(self) -> tuple[tuple[float, float], ...]:
+        """Sky points a footprint must contain to cover this sample.
+
+        The representative coordinate plus any finite interval-boundary
+        coordinates. Samples without boundary data degrade to the
+        representative point alone.
+        """
+        points = [(self.icrs_ra_deg, self.icrs_dec_deg)]
+        for ra, dec in (
+            (self.near_icrs_ra_deg, self.near_icrs_dec_deg),
+            (self.far_icrs_ra_deg, self.far_icrs_dec_deg),
+        ):
+            if (
+                ra is not None
+                and dec is not None
+                and math.isfinite(ra)
+                and math.isfinite(dec)
+            ):
+                points.append((ra, dec))
+        return tuple(points)
+
+    @property
+    def is_operational(self) -> bool:
+        """Whether this sample may enter observing products.
+
+        Invalid samples can still carry finite coordinates (e.g. the
+        ``z > d/10`` model bound) as diagnostics; ``validity`` is the
+        authoritative gate, finiteness only a backstop.
+        """
+        return self.validity is not Validity.INVALID and math.isfinite(
+            self.icrs_ra_deg
+        )
 
 
 @dataclass(frozen=True)
@@ -783,7 +853,13 @@ class Corridor:
 
 @dataclass(frozen=True)
 class VisibilitySample:
-    """Site-dependent observing context at one grid time."""
+    """Site-dependent observing context at one grid time.
+
+    ``warnings`` carries Earth-orientation degradation (captured astropy
+    transform warnings, IERS coverage): degraded samples still pass or fail
+    constraints normally — altitude margins are degree-scale against
+    sub-arcsecond EOP errors — but the degradation is never silent.
+    """
 
     target_id: str
     role: Role
@@ -795,6 +871,7 @@ class VisibilitySample:
     moon_separation_deg: float
     constraints_passed: bool
     failed_constraints: tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -805,7 +882,9 @@ class Pointing:
     ``radius_arcsec`` is the conservative total; its components are kept
     separate so an assumed width is never mistaken for propagated
     covariance: ``radius = track_extent + (assumed or propagated half
-    width) + motion_padding``.
+    width) + motion_padding + window_drift``, where ``window_drift`` is the
+    additional extent the grouped samples sweep across the advertised
+    window's grid epochs beyond the representative-epoch track.
     """
 
     pointing_id: str
@@ -826,11 +905,23 @@ class Pointing:
     assumed_half_width_arcsec: float | None = None
     propagated_half_width_arcsec: float | None = None  # v1: never set
     motion_padding_arcsec: float = 0.0
+    # relay-distance interval this pointing claims to cover (first grouped
+    # sample's near bound through the last's far bound)
+    z_near_au: float | None = None
+    z_far_au: float | None = None
+    # positional drift envelope across the advertised window (grid-sampled)
+    window_drift_arcsec: float = 0.0
 
 
 @dataclass(frozen=True)
 class CalculationResult:
-    """Immutable calculation output plus provenance and warnings."""
+    """Immutable calculation output plus provenance and warnings.
+
+    ``iers_id`` is the resolved Earth-orientation resource identity —
+    ``iers_a:sha256:…`` for a pinned table, ``iers_bundled:…`` for astropy's
+    bundled data — recorded only when the request has apparent or
+    site-visibility products, which are the outputs that depend on it.
+    """
 
     calculation_id: str
     request: GeometryRequest
@@ -839,3 +930,4 @@ class CalculationResult:
     visibility: tuple[VisibilitySample, ...] = ()
     pointings: tuple[Pointing, ...] = ()
     warnings: tuple[str, ...] = ()
+    iers_id: str | None = None

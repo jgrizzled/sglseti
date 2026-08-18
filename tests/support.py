@@ -107,7 +107,7 @@ def make_locus_sample(**overrides: Any) -> Any:
         icrs_dec_deg=60.90,
         observer_id="test-site",
         model_id="tusay2022_eq5_7_v1",
-        model_version="1.0.0",
+        model_version="1.1.0",
         target_source_hash="sha256:test",
         ephemeris_id="fake_fixture_ephemeris",
         validity=Validity.VALID,
@@ -121,6 +121,7 @@ def build_small_result(
     *,
     planned: bool = False,
     ephemeris: Any | None = None,
+    target_distance_au: float = 200_000.0,
     **request_overrides: Any,
 ) -> Any:
     """A small, fully deterministic CalculationResult for export tests.
@@ -164,7 +165,7 @@ def build_small_result(
             reference_epoch_jyear=2016.0,
             reference_epoch_scale="tdb",
             source="export test values",
-            distance_pc=200_000.0 / AU_PER_PC,
+            distance_pc=target_distance_au / AU_PER_PC,
             radial_velocity_km_s=0.0,
         ),
     )

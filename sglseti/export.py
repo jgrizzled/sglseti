@@ -47,7 +47,7 @@ __all__ = [
     "write_products",
 ]
 
-RESULT_SCHEMA_VERSION = 1
+RESULT_SCHEMA_VERSION = 2
 
 #: Fixed coordinate/time conventions recorded in every manifest (PRD §9.4).
 CONVENTIONS = {
@@ -174,6 +174,7 @@ def result_manifest(
             )
         },
         "ephemeris_ids": sorted({s.ephemeris_id for s in result.samples}),
+        "iers_id": result.iers_id,
         "input_file_hashes": dict(sorted(input_file_hashes.items())),
         "conventions": CONVENTIONS,
     }
@@ -196,7 +197,7 @@ def _versions() -> dict[str, str]:
     from importlib.metadata import PackageNotFoundError, version
 
     versions = {"python": platform.python_version()}
-    for package in ("sglseti", "astropy", "numpy", "pyerfa"):
+    for package in ("sglseti", "astropy", "astropy-iers-data", "numpy", "pyerfa"):
         try:
             versions[package] = version(package)
         except PackageNotFoundError:  # pragma: no cover
@@ -211,6 +212,7 @@ def _canonical_request(result: CalculationResult) -> Any:
     canonical["fields"]["ephemeris"] = (
         ephemeris_ids[0] if len(ephemeris_ids) == 1 else ephemeris_ids
     )
+    canonical["fields"]["iers"] = result.iers_id
     return canonical
 
 
@@ -344,8 +346,8 @@ def _json_safe(row: dict[str, Any]) -> dict[str, Any]:
 def _write_ds9(path: Path, result: CalculationResult) -> Path:
     """Corridor polylines + assumed-width circles, and pointing circles.
 
-    Invalid (NaN-coordinate) samples are skipped and counted in the header
-    comment so their absence is visible.
+    Non-operational samples (invalid validity or non-finite coordinates) are
+    skipped and counted in the header comment so their absence is visible.
     """
     half_width = result.request.assumed_half_width_arcsec
     assert half_width is not None  # request validation guarantees this
@@ -358,7 +360,7 @@ def _write_ds9(path: Path, result: CalculationResult) -> Path:
     ]
     skipped = 0
     for corridor in result.corridors:
-        valid = [s for s in corridor.samples if math.isfinite(s.icrs_ra_deg)]
+        valid = [s for s in corridor.samples if s.is_operational]
         skipped += len(corridor.samples) - len(valid)
         for sample in valid:
             lines.append(

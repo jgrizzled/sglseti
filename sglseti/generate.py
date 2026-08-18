@@ -27,12 +27,20 @@ iteration, never by materializing intermediate per-combination products.
 from __future__ import annotations
 
 import math
+import warnings as _warnings
 
-from .ephemeris import AstropyEphemeris, Ephemeris
+from .ephemeris import (
+    WARN_IERS_COVERAGE,
+    AstropyEphemeris,
+    Ephemeris,
+    IersResource,
+    bundled_iers_id,
+)
 from .errors import EphemerisCoverageError, GenerationError
 from .geometry import (
     C_AU_PER_DAY,
     GeometryModel,
+    RelaySolution,
     Tusay2022Eq57V1,
     altaz_apparent,
     cirs_apparent,
@@ -149,15 +157,31 @@ def generate_loci(
     epochs = materialize_epochs(request.time)
     targets = [registry[tid] for tid in request.target_ids]
     target_hashes = {target.target_id: stable_hash(target) for target in targets}
-    calculation_id = _calculation_id(request, model, ephemeris, target_hashes)
+
+    want_cirs = CoordinateProduct.CIRS in request.coordinate_products
+    want_altaz = CoordinateProduct.ALTAZ in request.coordinate_products
+    # Earth orientation only touches apparent and site-visibility products;
+    # its identity enters the calculation ID exactly when those exist.
+    iers_sensitive = want_cirs or want_altaz or request.observability is not None
+    iers_resource = (
+        IersResource(request.iers)
+        if request.iers is not None and iers_sensitive
+        else None
+    )
+    iers_id = (
+        (iers_resource.iers_id if iers_resource else bundled_iers_id())
+        if iers_sensitive
+        else None
+    )
+    calculation_id = _calculation_id(
+        request, model, ephemeris, target_hashes, iers_id
+    )
 
     uncertainty_method = (
         UncertaintyMethod.ASSUMED
         if request.assumed_half_width_arcsec is not None
         else UncertaintyMethod.NOT_PROPAGATED
     )
-    want_cirs = CoordinateProduct.CIRS in request.coordinate_products
-    want_altaz = CoordinateProduct.ALTAZ in request.coordinate_products
 
     samples: list[LocusSample] = []
     corridors: list[Corridor] = []
@@ -188,6 +212,7 @@ def generate_loci(
                         uncertainty_method=uncertainty_method,
                         want_cirs=want_cirs,
                         want_altaz=want_altaz,
+                        iers_resource=iers_resource,
                     )
                     if sample.validity is Validity.INVALID:
                         invalid_count += 1
@@ -228,6 +253,7 @@ def generate_loci(
         samples=tuple(samples),
         corridors=tuple(corridors),
         warnings=tuple(warnings),
+        iers_id=iers_id,
     )
 
 
@@ -236,11 +262,15 @@ def _calculation_id(
     model: GeometryModel,
     ephemeris: Ephemeris,
     target_hashes: dict[str, str],
+    iers_id: str | None,
 ) -> str:
     canonical_request = canonicalize(request)
-    # A file-backed ephemeris contributes its content identity, never its
-    # location: replace the spec (which may carry a path) wholesale.
+    # File-backed resources contribute their content identity, never their
+    # location: replace the specs (which may carry paths) wholesale. The
+    # IERS identity is None for requests without apparent/site products, so
+    # purely geometric IDs never churn with Earth-orientation releases.
     canonical_request["fields"]["ephemeris"] = ephemeris.ephemeris_id
+    canonical_request["fields"]["iers"] = iers_id
     return stable_id(
         "calc",
         {
@@ -248,6 +278,7 @@ def _calculation_id(
             "model": {"id": model.model_id, "version": model.model_version},
             "target_source_hashes": dict(sorted(target_hashes.items())),
             "ephemeris_id": ephemeris.ephemeris_id,
+            "iers_id": iers_id,
         },
     )
 
@@ -270,18 +301,30 @@ def _compute_sample(
     uncertainty_method: UncertaintyMethod,
     want_cirs: bool,
     want_altaz: bool,
+    iers_resource: IersResource | None,
 ) -> LocusSample:
     z_au = segment.z_rep_au
-    try:
-        solution = compute_relay_solution(
+
+    def _solve(at_z_au: float) -> RelaySolution:
+        return compute_relay_solution(
             target=target,
             observation_time=epoch.time,
-            z_au=z_au,
+            z_au=at_z_au,
             role=role,
             observer=request.observer,
             ephemeris=ephemeris,
             model=model,
         )
+
+    try:
+        solution = _solve(z_au)
+        # Interval boundaries: the segment represents [z_near, z_far], and a
+        # pointing footprint must cover those extremes, not just z_rep.
+        if segment.is_point:
+            near_solution = far_solution = solution
+        else:
+            near_solution = _solve(segment.z_near_au)
+            far_solution = _solve(segment.z_far_au)
     except EphemerisCoverageError as exc:
         return _invalid_sample(
             request=request,
@@ -297,10 +340,30 @@ def _compute_sample(
             reason=f"{WARN_EPHEMERIS_COVERAGE}: {exc}",
         )
 
-    cirs = cirs_apparent(solution) if want_cirs else (None, None)
-    altaz = altaz_apparent(solution) if want_altaz else (None, None)
-    rates = (
-        motion_rates(
+    # Apparent products depend on Earth orientation: capture transform
+    # warnings (extrapolated polar motion/UT1, dubious ERFA years) into the
+    # sample instead of letting them evaporate at the console, and pre-check
+    # a pinned table's coverage deterministically.
+    apparent_warnings: list[str] = []
+    cirs: tuple[float | None, float | None] = (None, None)
+    altaz: tuple[float | None, float | None] = (None, None)
+    if want_cirs or want_altaz:
+        iers_table = iers_resource.table if iers_resource is not None else None
+        if iers_resource is not None and not iers_resource.covers(epoch.time):
+            apparent_warnings.append(WARN_IERS_COVERAGE)
+        with _warnings.catch_warnings(record=True) as caught:
+            _warnings.simplefilter("always")
+            if want_cirs:
+                cirs = cirs_apparent(solution, iers_table=iers_table)
+            if want_altaz:
+                altaz = altaz_apparent(solution, iers_table=iers_table)
+        apparent_warnings.extend(
+            dict.fromkeys(f"astropy:{w.message}" for w in caught)
+        )
+    rates = None
+    near_rates = None
+    if request.include_rates:
+        rates = motion_rates(
             target=target,
             observation_time=epoch.time,
             z_au=z_au,
@@ -310,11 +373,27 @@ def _compute_sample(
             model=model,
             step_s=RATE_STEP_S,
         )
-        if request.include_rates
-        else None
-    )
+        # The near boundary is the interval's fastest point (rate ~ 1/z), so
+        # motion padding must be sized there, not at the representative.
+        near_rates = (
+            rates
+            if segment.is_point
+            else motion_rates(
+                target=target,
+                observation_time=epoch.time,
+                z_au=segment.z_near_au,
+                role=role,
+                observer=request.observer,
+                ephemeris=ephemeris,
+                model=model,
+                step_s=RATE_STEP_S,
+            )
+        )
 
     direction = solution.direction
+    validity = direction.validity
+    if apparent_warnings and validity is Validity.VALID:
+        validity = Validity.DEGRADED
     return LocusSample(
         calculation_id=calculation_id,
         epoch_id=epoch.epoch_id,
@@ -342,9 +421,9 @@ def _compute_sample(
         model_version=direction.model_version,
         target_source_hash=target_source_hash,
         ephemeris_id=solution.ephemeris_id,
-        validity=direction.validity,
+        validity=validity,
         uncertainty_method=uncertainty_method,
-        warnings=direction.warnings,
+        warnings=(*direction.warnings, *apparent_warnings),
         cirs_ra_deg=cirs[0],
         cirs_dec_deg=cirs[1],
         altaz_alt_deg=altaz[0],
@@ -353,6 +432,20 @@ def _compute_sample(
             rates.rate_ra_cosdec_arcsec_per_hr if rates else None
         ),
         rate_dec_arcsec_per_hr=rates.rate_dec_arcsec_per_hr if rates else None,
+        z_near_au=segment.z_near_au,
+        z_far_au=segment.z_far_au,
+        q_lo_per_au=segment.q_lo_per_au,
+        q_hi_per_au=segment.q_hi_per_au,
+        near_icrs_ra_deg=near_solution.los_icrs_ra_deg,
+        near_icrs_dec_deg=near_solution.los_icrs_dec_deg,
+        far_icrs_ra_deg=far_solution.los_icrs_ra_deg,
+        far_icrs_dec_deg=far_solution.los_icrs_dec_deg,
+        near_rate_ra_cosdec_arcsec_per_hr=(
+            near_rates.rate_ra_cosdec_arcsec_per_hr if near_rates else None
+        ),
+        near_rate_dec_arcsec_per_hr=(
+            near_rates.rate_dec_arcsec_per_hr if near_rates else None
+        ),
     )
 
 
@@ -401,6 +494,14 @@ def _invalid_sample(
         validity=Validity.INVALID,
         uncertainty_method=uncertainty_method,
         warnings=(reason,),
+        z_near_au=segment.z_near_au,
+        z_far_au=segment.z_far_au,
+        q_lo_per_au=segment.q_lo_per_au,
+        q_hi_per_au=segment.q_hi_per_au,
+        near_icrs_ra_deg=nan,
+        near_icrs_dec_deg=nan,
+        far_icrs_ra_deg=nan,
+        far_icrs_dec_deg=nan,
     )
 
 

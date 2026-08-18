@@ -30,12 +30,14 @@ _EXPORTS = {
     "EphemerisError": "sglseti.errors",
     "EphemerisCoverageError": "sglseti.errors",
     "AstropyEphemeris": "sglseti.ephemeris",
+    "IersResource": "sglseti.ephemeris",
     "KNOWN_KERNELS": "sglseti.resources",
     "fetch_kernel": "sglseti.resources",
-    "refresh_iers": "sglseti.resources",
+    "fetch_iers": "sglseti.resources",
     "Tusay2022Eq57V1": "sglseti.geometry",
     "compute_relay_solution": "sglseti.geometry",
     "motion_rates": "sglseti.geometry",
+    "solar_focal_min_au": "sglseti.geometry",
     "generate_loci": "sglseti.generate",
     "materialize_epochs": "sglseti.generate",
     "GenerationError": "sglseti.errors",
@@ -64,6 +66,7 @@ _EXPORTS = {
     "Target": "sglseti.models",
     "Observer": "sglseti.models",
     "EphemerisSpec": "sglseti.models",
+    "IersSpec": "sglseti.models",
     "RelayRange": "sglseti.models",
     "SamplingSpec": "sglseti.models",
     "Epoch": "sglseti.models",
@@ -97,7 +100,7 @@ __all__ = ["__version__", *sorted(_EXPORTS)]
 
 if TYPE_CHECKING:
     from .config import load_epoch_table, load_request
-    from .ephemeris import AstropyEphemeris
+    from .ephemeris import AstropyEphemeris, IersResource
     from .errors import (
         ConfigError,
         EphemerisCoverageError,
@@ -108,7 +111,12 @@ if TYPE_CHECKING:
     )
     from .export import RESULT_SCHEMA_VERSION, result_manifest, write_products
     from .generate import generate_loci, materialize_epochs
-    from .geometry import Tusay2022Eq57V1, compute_relay_solution, motion_rates
+    from .geometry import (
+        Tusay2022Eq57V1,
+        compute_relay_solution,
+        motion_rates,
+        solar_focal_min_au,
+    )
     from .models import (
         SUPPORTED_MODEL_IDS,
         AstrometricState,
@@ -123,6 +131,7 @@ if TYPE_CHECKING:
         Epoch,
         FieldOfView,
         GeometryRequest,
+        IersSpec,
         LocusSample,
         ObservabilityConstraints,
         Observer,
@@ -153,7 +162,7 @@ if TYPE_CHECKING:
         stable_hash,
         stable_id,
     )
-    from .resources import KNOWN_KERNELS, fetch_kernel, refresh_iers
+    from .resources import KNOWN_KERNELS, fetch_iers, fetch_kernel
     from .sampling import generate_segments, segments_for_request
     from .targets import TargetRegistry, load_target_registry
 

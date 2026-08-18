@@ -120,11 +120,11 @@ Terminology rules (binding on code, docs, and output columns):
 
 | Condition | Behavior |
 |---|---|
-| `z > d/10` | `invalid` (model bound stated by Tusay et al.) |
-| `z < 547.7576 AU` (solar z_min) | warning `below_solar_focal_minimum` (geometry still computed; z_min from `solar_focal_distance.yaml`) |
-| catalog propagation span `|u − reference_epoch| > 75 yr` | warning `long_propagation_span` (linear-motion degradation; preliminary bound) |
-| missing radial velocity (flagged target) | warning `missing_radial_velocity`; perspective terms unmodeled |
-| ephemeris out of coverage | `invalid`, no nominal row |
+| `z > d/10` | `degraded`, warning `outside_search_prior` — the Tusay et al. probe-placement search prior controlling the ρ ≈ z approximation error, not a derived bound of eq. 5–7 (model 1.1.0; previously `invalid`) |
+| `z < f_inf·d/(d − f_inf)` (finite-source solar z_min; `f_inf` = 547.7576 AU from `solar_focal_distance.yaml`) | `degraded`, warning `below_solar_focal_minimum` — geometry still computed, but the Sun cannot focus this source's light there; ideal photospheric threshold, practical limits farther out (model 1.1.0; previously infinite-source constant and warning-only) |
+| catalog propagation span `|u − reference_epoch| > 75 yr` | `degraded`, warning `long_propagation_span` (linear-motion degradation; preliminary bound) |
+| missing radial velocity (flagged target) | `degraded`, warning `missing_radial_velocity`; perspective terms unmodeled |
+| ephemeris out of coverage | `invalid`, no nominal row — `invalid` is reserved for uninterpretable results |
 
 ## 6. Preliminary numerical tolerances
 

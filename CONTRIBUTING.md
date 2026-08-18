@@ -13,8 +13,7 @@ uv run mypy
 
 ## Layout
 
-- `sglseti/` — the package. Keep the dependency direction from
-  `notes/implementation_plan.md` §4.1: models → geometry/sampling →
+- `sglseti/` — the package. §4.1: models → geometry/sampling →
   generate → observability → planning → export → CLI. Exporters never
   recalculate geometry; the CLI only parses arguments, calls public
   functions, writes results, and formats errors.

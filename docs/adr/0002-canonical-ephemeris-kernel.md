@@ -34,8 +34,11 @@ DE421 (old solution, future coverage ends 2053).
    `sglseti.resources`) — never during calculation. `fetch ephemeris`
    downloads a registry kernel (checksum-pinned) or an explicit `--url`
    (checksum always reported, verified when expected), atomically; `fetch
-   iers` refreshes astropy's IERS-A cache (sub-arcsecond nicety, never
-   required).
+   iers` downloads the IERS-A table the same way — a pinned local file for
+   a request's `iers` block, installed explicitly per calculation
+   (sub-arcsecond nicety, never required; originally a cache refresh,
+   changed 2026-08 when review finding 3 showed the cached table was never
+   actually consumed).
 4. Astropy's *named* remote ephemerides (`solar_system_ephemeris.set('jpl')`
    etc.) are **not** offered as an adapter: they download inside a
    calculation on first use and manage identity outside our manifest.
