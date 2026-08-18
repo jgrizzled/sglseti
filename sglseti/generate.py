@@ -22,12 +22,22 @@ and the astrometric record hashes of exactly the requested targets.
 
 Memory stays bounded by the output itself: rows are produced by streaming
 iteration, never by materializing intermediate per-combination products.
+For archive-scale runs (§3.4), :func:`plan_calculation` resolves the
+deterministic execution plan up front and :func:`iter_locus_chunks` yields
+one :class:`LocusChunk` per target/role/epoch — in exactly the documented
+product order, sliceable by chunk index — without materializing the full
+result. A chunk is independently reproducible: re-running any index range
+of the same plan produces identical corridors with the same
+``calculation_id``, so parallel execution can remain a downstream
+orchestration concern.
 """
 
 from __future__ import annotations
 
 import math
 import warnings as _warnings
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
 
 from .ephemeris import (
     WARN_IERS_COVERAGE,
@@ -59,6 +69,7 @@ from .models import (
     Target,
     TargetEventKind,
     TimeGrid,
+    TimeIntervals,
     TimeList,
     TimeSingle,
     TimeSpec,
@@ -66,14 +77,22 @@ from .models import (
     Validity,
 )
 from .provenance import canonicalize, stable_hash, stable_id
+from .providers import (
+    resolve_observer_state_provider,
+    resolve_target_state_provider,
+)
 from .sampling import generate_segments
 from .targets import TargetRegistry
 
 __all__ = [
     "MAX_MATERIALIZED_EPOCHS",
     "RATE_STEP_S",
+    "CalculationPlan",
+    "LocusChunk",
     "generate_loci",
+    "iter_locus_chunks",
     "materialize_epochs",
+    "plan_calculation",
 ]
 
 #: Finite-difference step for locus angular rates (recorded in manifests).
@@ -103,12 +122,35 @@ def materialize_epochs(time_spec: TimeSpec) -> tuple[Epoch, ...]:
     """Expand a validated time specification into concrete epochs.
 
     Grid epochs get deterministic IDs ``grid-000000``, ``grid-000001``, …
-    in ascending time order; list and single modes keep caller IDs.
+    in ascending time order; list and single modes keep caller IDs;
+    observation intervals expand to their labeled sample times with IDs
+    ``<interval_id>@<phase>`` and the interval linkage carried on each
+    epoch (and so onto every product row).
     """
     if isinstance(time_spec, TimeSingle):
         return (time_spec.epoch,)
     if isinstance(time_spec, TimeList):
         return time_spec.epochs
+    if isinstance(time_spec, TimeIntervals):
+        epochs: list[Epoch] = []
+        for interval in time_spec.intervals:
+            for phase, time in interval.labeled_sample_times():
+                epochs.append(
+                    Epoch(
+                        epoch_id=f"{interval.interval_id}@{phase}",
+                        time=time,
+                        metadata=interval.metadata,
+                        interval_id=interval.interval_id,
+                        interval_phase=phase,
+                        interval_duration_s=interval.duration_s,
+                    )
+                )
+        if len(epochs) > MAX_MATERIALIZED_EPOCHS:
+            raise GenerationError(
+                f"intervals would materialize {len(epochs)} epochs; "
+                f"limit is {MAX_MATERIALIZED_EPOCHS}"
+            )
+        return tuple(epochs)
     assert isinstance(time_spec, TimeGrid)
     from astropy.time import TimeDelta
 
@@ -129,20 +171,64 @@ def materialize_epochs(time_spec: TimeSpec) -> tuple[Epoch, ...]:
     )
 
 
-def generate_loci(
+@dataclass(frozen=True)
+class CalculationPlan:
+    """The resolved, deterministic execution plan of one request (§3.4).
+
+    Everything :func:`iter_locus_chunks` needs — resolved model and
+    ephemeris, materialized epochs, target hashes, Earth-orientation
+    resource, and the ``calculation_id`` — computed once so chunked and
+    batch execution share one identity and one code path.
+    ``chunk_count`` is ``targets x roles x epochs``.
+    """
+
+    request: GeometryRequest
+    calculation_id: str
+    chunk_count: int
+    epochs: tuple[Epoch, ...]
+    targets: tuple[Target, ...]
+    target_hashes: Mapping[str, str]
+    model: GeometryModel
+    ephemeris: Ephemeris
+    iers_resource: IersResource | None
+    iers_id: str | None
+    uncertainty_method: UncertaintyMethod
+    want_cirs: bool
+    want_altaz: bool
+    #: (provider_id, provider_version, content_hash) per target and for the
+    #: observer — recorded on every product row (§3.5).
+    target_provider_identities: Mapping[str, tuple[str, str, str]]
+    observer_provider_identity: tuple[str, str, str]
+
+
+@dataclass(frozen=True)
+class LocusChunk:
+    """One deterministic unit of chunked execution: a full corridor.
+
+    ``chunk_index`` enumerates the documented product order (targets x
+    roles x epochs); the corridor carries the shared ``calculation_id``,
+    so any index range recomputed later (or elsewhere) is byte-identical
+    to the same range of the full run.
+    """
+
+    chunk_index: int
+    chunk_count: int
+    corridor: Corridor
+    invalid_count: int
+    degraded_count: int
+
+
+def plan_calculation(
     request: GeometryRequest,
     registry: TargetRegistry,
     *,
     model: GeometryModel | None = None,
     ephemeris: Ephemeris | None = None,
-    strict: bool = False,
-) -> CalculationResult:
-    """Run the batch calculation for a validated request.
+) -> CalculationPlan:
+    """Resolve a request into its deterministic execution plan.
 
     ``model`` and ``ephemeris`` default to what the request specifies and
-    exist as parameters for testing with deterministic fakes; passing a
-    different scientific configuration than the request describes is the
-    caller's responsibility to record.
+    exist as parameters for testing with deterministic fakes.
     """
     unknown = [tid for tid in request.target_ids if tid not in registry]
     if unknown:
@@ -155,7 +241,7 @@ def generate_loci(
         ephemeris = AstropyEphemeris(request.ephemeris)
 
     epochs = materialize_epochs(request.time)
-    targets = [registry[tid] for tid in request.target_ids]
+    targets = tuple(registry[tid] for tid in request.target_ids)
     target_hashes = {target.target_id: stable_hash(target) for target in targets}
 
     want_cirs = CoordinateProduct.CIRS in request.coordinate_products
@@ -176,28 +262,98 @@ def generate_loci(
     calculation_id = _calculation_id(
         request, model, ephemeris, target_hashes, iers_id
     )
-
     uncertainty_method = (
         UncertaintyMethod.ASSUMED
         if request.assumed_half_width_arcsec is not None
         else UncertaintyMethod.NOT_PROPAGATED
     )
-
-    samples: list[LocusSample] = []
-    corridors: list[Corridor] = []
-    invalid_count = 0
-    degraded_count = 0
-
+    target_provider_identities = {}
     for target in targets:
+        provider = resolve_target_state_provider(target)
+        target_provider_identities[target.target_id] = (
+            provider.provider_id,
+            provider.provider_version,
+            provider.content_hash,
+        )
+    observer_provider = resolve_observer_state_provider(request.observer, ephemeris)
+    observer_provider_identity = (
+        observer_provider.provider_id,
+        observer_provider.provider_version,
+        observer_provider.content_hash,
+    )
+    return CalculationPlan(
+        request=request,
+        calculation_id=calculation_id,
+        chunk_count=len(targets) * len(request.roles) * len(epochs),
+        epochs=epochs,
+        targets=targets,
+        target_hashes=target_hashes,
+        model=model,
+        ephemeris=ephemeris,
+        iers_resource=iers_resource,
+        iers_id=iers_id,
+        uncertainty_method=uncertainty_method,
+        want_cirs=want_cirs,
+        want_altaz=want_altaz,
+        target_provider_identities=target_provider_identities,
+        observer_provider_identity=observer_provider_identity,
+    )
+
+
+def iter_locus_chunks(
+    request: GeometryRequest,
+    registry: TargetRegistry,
+    *,
+    plan: CalculationPlan | None = None,
+    model: GeometryModel | None = None,
+    ephemeris: Ephemeris | None = None,
+    strict: bool = False,
+    start: int = 0,
+    stop: int | None = None,
+) -> Iterator[LocusChunk]:
+    """Yield corridors one chunk at a time, never the full result (§3.4).
+
+    Chunks arrive in the documented product order; ``start``/``stop``
+    select a chunk-index range of the SAME full calculation (identities
+    unchanged), which is how a downstream orchestrator distributes work.
+    Pass a precomputed ``plan`` to skip re-resolution; it must belong to
+    this request.
+    """
+    if plan is None:
+        plan = plan_calculation(request, registry, model=model, ephemeris=ephemeris)
+    elif plan.request != request:
+        raise GenerationError("the supplied plan was built for a different request")
+    if start < 0 or (stop is not None and stop < start):
+        raise GenerationError(
+            f"invalid chunk range [{start}, {stop}); chunk_count is {plan.chunk_count}"
+        )
+    yield from _iter_chunks(plan, strict=strict, start=start, stop=stop)
+
+
+def _iter_chunks(
+    plan: CalculationPlan, *, strict: bool, start: int, stop: int | None
+) -> Iterator[LocusChunk]:
+    request = plan.request
+    index = -1
+    for target in plan.targets:
         for role in request.roles:
-            segments = generate_segments(
-                target_id=target.target_id,
-                role=role,
-                relay_range=request.relay_range,
-                sampling=request.sampling,
-            )
-            for epoch in epochs:
+            segments = None
+            for epoch in plan.epochs:
+                index += 1
+                if index < start:
+                    continue
+                if stop is not None and index >= stop:
+                    return
+                if segments is None:
+                    segments = generate_segments(
+                        target_id=target.target_id,
+                        role=role,
+                        relay_range=request.relay_range,
+                        sampling=request.sampling,
+                    )
                 corridor_samples: list[LocusSample] = []
+                invalid_count = 0
+                degraded_count = 0
                 for segment in segments:
                     sample = _compute_sample(
                         request=request,
@@ -205,14 +361,18 @@ def generate_loci(
                         role=role,
                         epoch=epoch,
                         segment=segment,
-                        model=model,
-                        ephemeris=ephemeris,
-                        calculation_id=calculation_id,
-                        target_source_hash=target_hashes[target.target_id],
-                        uncertainty_method=uncertainty_method,
-                        want_cirs=want_cirs,
-                        want_altaz=want_altaz,
-                        iers_resource=iers_resource,
+                        model=plan.model,
+                        ephemeris=plan.ephemeris,
+                        calculation_id=plan.calculation_id,
+                        target_source_hash=plan.target_hashes[target.target_id],
+                        uncertainty_method=plan.uncertainty_method,
+                        want_cirs=plan.want_cirs,
+                        want_altaz=plan.want_altaz,
+                        iers_resource=plan.iers_resource,
+                        target_provider=plan.target_provider_identities[
+                            target.target_id
+                        ],
+                        observer_provider=plan.observer_provider_identity,
                     )
                     if sample.validity is Validity.INVALID:
                         invalid_count += 1
@@ -226,21 +386,54 @@ def generate_loci(
                     elif sample.validity is Validity.DEGRADED:
                         degraded_count += 1
                     corridor_samples.append(sample)
-                corridors.append(
-                    _build_corridor(
-                        request=request,
-                        calculation_id=calculation_id,
-                        target=target,
-                        role=role,
-                        epoch=epoch,
-                        corridor_samples=tuple(corridor_samples),
-                        uncertainty_method=uncertainty_method,
-                    )
+                corridor = _build_corridor(
+                    request=request,
+                    calculation_id=plan.calculation_id,
+                    target=target,
+                    role=role,
+                    epoch=epoch,
+                    corridor_samples=tuple(corridor_samples),
+                    uncertainty_method=plan.uncertainty_method,
                 )
-                samples.extend(corridor_samples)
+                yield LocusChunk(
+                    chunk_index=index,
+                    chunk_count=plan.chunk_count,
+                    corridor=corridor,
+                    invalid_count=invalid_count,
+                    degraded_count=degraded_count,
+                )
+
+
+def generate_loci(
+    request: GeometryRequest,
+    registry: TargetRegistry,
+    *,
+    model: GeometryModel | None = None,
+    ephemeris: Ephemeris | None = None,
+    strict: bool = False,
+) -> CalculationResult:
+    """Run the batch calculation for a validated request.
+
+    ``model`` and ``ephemeris`` default to what the request specifies and
+    exist as parameters for testing with deterministic fakes; passing a
+    different scientific configuration than the request describes is the
+    caller's responsibility to record. Built on :func:`iter_locus_chunks`,
+    so batch and chunked execution share one code path and one identity.
+    """
+    plan = plan_calculation(request, registry, model=model, ephemeris=ephemeris)
+
+    samples: list[LocusSample] = []
+    corridors: list[Corridor] = []
+    invalid_count = 0
+    degraded_count = 0
+    for chunk in _iter_chunks(plan, strict=strict, start=0, stop=None):
+        corridors.append(chunk.corridor)
+        samples.extend(chunk.corridor.samples)
+        invalid_count += chunk.invalid_count
+        degraded_count += chunk.degraded_count
 
     warnings: list[str] = []
-    if uncertainty_method is UncertaintyMethod.NOT_PROPAGATED:
+    if plan.uncertainty_method is UncertaintyMethod.NOT_PROPAGATED:
         warnings.append(WARN_UNCERTAINTY_NOT_PROPAGATED)
     if invalid_count:
         warnings.append(f"invalid_sample_count:{invalid_count}")
@@ -248,12 +441,12 @@ def generate_loci(
         warnings.append(f"degraded_sample_count:{degraded_count}")
 
     return CalculationResult(
-        calculation_id=calculation_id,
+        calculation_id=plan.calculation_id,
         request=request,
         samples=tuple(samples),
         corridors=tuple(corridors),
         warnings=tuple(warnings),
-        iers_id=iers_id,
+        iers_id=plan.iers_id,
     )
 
 
@@ -302,6 +495,8 @@ def _compute_sample(
     want_cirs: bool,
     want_altaz: bool,
     iers_resource: IersResource | None,
+    target_provider: tuple[str, str, str],
+    observer_provider: tuple[str, str, str],
 ) -> LocusSample:
     z_au = segment.z_rep_au
 
@@ -337,6 +532,8 @@ def _compute_sample(
             ephemeris_id=ephemeris.ephemeris_id,
             model=model,
             uncertainty_method=uncertainty_method,
+            target_provider=target_provider,
+            observer_provider=observer_provider,
             reason=f"{WARN_EPHEMERIS_COVERAGE}: {exc}",
         )
 
@@ -421,9 +618,18 @@ def _compute_sample(
         model_version=direction.model_version,
         target_source_hash=target_source_hash,
         ephemeris_id=solution.ephemeris_id,
+        target_provider_id=target_provider[0],
+        target_provider_version=target_provider[1],
+        target_provider_hash=target_provider[2],
+        observer_provider_id=observer_provider[0],
+        observer_provider_version=observer_provider[1],
+        observer_provider_hash=observer_provider[2],
         validity=validity,
         uncertainty_method=uncertainty_method,
         warnings=(*direction.warnings, *apparent_warnings),
+        interval_id=epoch.interval_id,
+        interval_phase=epoch.interval_phase,
+        interval_duration_s=epoch.interval_duration_s,
         cirs_ra_deg=cirs[0],
         cirs_dec_deg=cirs[1],
         altaz_alt_deg=altaz[0],
@@ -461,6 +667,8 @@ def _invalid_sample(
     ephemeris_id: str,
     model: GeometryModel,
     uncertainty_method: UncertaintyMethod,
+    target_provider: tuple[str, str, str],
+    observer_provider: tuple[str, str, str],
     reason: str,
 ) -> LocusSample:
     """An explicitly invalid status row: NaN coordinates, never fake values."""
@@ -491,9 +699,18 @@ def _invalid_sample(
         model_version=model.model_version,
         target_source_hash=target_source_hash,
         ephemeris_id=ephemeris_id,
+        target_provider_id=target_provider[0],
+        target_provider_version=target_provider[1],
+        target_provider_hash=target_provider[2],
+        observer_provider_id=observer_provider[0],
+        observer_provider_version=observer_provider[1],
+        observer_provider_hash=observer_provider[2],
         validity=Validity.INVALID,
         uncertainty_method=uncertainty_method,
         warnings=(reason,),
+        interval_id=epoch.interval_id,
+        interval_phase=epoch.interval_phase,
+        interval_duration_s=epoch.interval_duration_s,
         z_near_au=segment.z_near_au,
         z_far_au=segment.z_far_au,
         q_lo_per_au=segment.q_lo_per_au,

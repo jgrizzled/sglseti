@@ -142,6 +142,16 @@ class Ephemeris(Protocol):
 
     def moon_barycentric_au(self, time: Time) -> np.ndarray: ...
 
+    def body_barycentric_au(self, body: str, time: Time) -> np.ndarray:
+        """Barycentric position of a named Solar-System body (§2.4).
+
+        Backs the ``solar_system_body`` observer family. A body the
+        resource cannot serve raises
+        :class:`~sglseti.errors.EphemerisError`, never a fabricated
+        position.
+        """
+        ...
+
 
 class AstropyEphemeris:
     """Astropy-backed ephemeris: built-in analytic mode or a local JPL kernel.
@@ -152,6 +162,9 @@ class AstropyEphemeris:
     """
 
     def __init__(self, spec: EphemerisSpec | None = None) -> None:
+        from collections import OrderedDict
+
+        self._position_cache: OrderedDict[tuple[str, float, float], Any] = OrderedDict()
         self.spec = spec if spec is not None else EphemerisSpec()
         if self.spec.adapter is EphemerisAdapter.ASTROPY_BUILTIN:
             self._value = "builtin"
@@ -195,7 +208,36 @@ class AstropyEphemeris:
         # jplephem, surfaced as an EphemerisError below.
         return self._body_barycentric_au("moon", time)
 
+    def body_barycentric_au(self, body: str, time: Time) -> np.ndarray:
+        """Barycentric position of any body the resource can serve."""
+        return self._body_barycentric_au(body, time)
+
     def _body_barycentric_au(self, body: str, time: Time) -> np.ndarray:
+
+        # Scalar epochs are memoized per (body, two-double TDB JD) — a pure,
+        # bit-identical reuse of repeated target/role/epoch evaluations
+        # (§3.4). Vector times pass straight through.
+        key = None
+        if time.isscalar:
+            tdb = time.tdb
+            key = (body, float(tdb.jd1), float(tdb.jd2))
+            cached = self._position_cache.get(key)
+            if cached is not None:
+                self._position_cache.move_to_end(key)
+                copy: np.ndarray = cached.copy()
+                return copy
+        position_au = self._compute_body_barycentric_au(body, time)
+        if key is not None:
+            self._position_cache[key] = position_au.copy()
+            if len(self._position_cache) > self._POSITION_CACHE_MAX:
+                self._position_cache.popitem(last=False)
+        result: np.ndarray = position_au
+        return result
+
+    #: Bound on the per-instance scalar-position memo (three bodies x epochs).
+    _POSITION_CACHE_MAX = 16384
+
+    def _compute_body_barycentric_au(self, body: str, time: Time) -> np.ndarray:
         import numpy as np
         from astropy import units as u
         from astropy.coordinates import get_body_barycentric, solar_system_ephemeris

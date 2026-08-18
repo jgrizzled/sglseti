@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 from astropy.time import Time, TimeDelta
@@ -66,6 +66,7 @@ from .models import (
     DirectionSolution,
     ImpactSample,
     LinkDirection,
+    ObservationInterval,
     Observer,
     Role,
     Target,
@@ -74,6 +75,10 @@ from .models import (
     Validity,
 )
 from .provenance import canonicalize, stable_hash, stable_id
+from .providers import (
+    resolve_observer_state_provider,
+    resolve_target_state_provider,
+)
 from .targets import TargetRegistry
 
 __all__ = [
@@ -86,6 +91,7 @@ __all__ = [
     "WARN_MINIMUM_AT_INTERVAL_STOP",
     "find_crossings",
     "impact_parameter",
+    "minimize_impact_parameter",
 ]
 
 #: The crossing axis contract identity (ADR-0003). The catalog direction it
@@ -223,6 +229,81 @@ def impact_parameter(
     )
 
 
+def minimize_impact_parameter(
+    *,
+    target: Target,
+    interval: ObservationInterval,
+    link_direction: LinkDirection,
+    observer: Observer,
+    z_au: float,
+    ephemeris: Ephemeris,
+    model: GeometryModel | None = None,
+    coarse_samples: int = 9,
+    refine_tolerance_s: float = 1.0,
+) -> ImpactSample:
+    """Minimize the impact parameter over one observation interval.
+
+    The interval companion to :func:`impact_parameter` (roadmap §3.3): an
+    external tool holding a telescope's actual schedule asks for the
+    closest beam-axis approach DURING one exposure or integration, without
+    a multi-year scan. A coarse grid over the interval brackets the global
+    minimum (impact-parameter minima are months apart, so any archival
+    exposure or sector-length stack is effectively unimodal), which is then
+    golden-section refined. A minimum at the interval boundary is normal
+    for an exposure — the boundary warning is informational and does not
+    degrade validity.
+    """
+    if model is None:
+        model = _MODEL_REGISTRY["tusay2022_eq5_7_v1"]()
+    if coarse_samples < 3:
+        raise GenerationError(f"coarse_samples must be at least 3, got {coarse_samples}")
+    if refine_tolerance_s <= 0.0 or not math.isfinite(refine_tolerance_s):
+        raise GenerationError(
+            f"refine_tolerance_s must be positive, got {refine_tolerance_s}"
+        )
+    start = interval.start.tdb
+    span_days = float((interval.stop.tdb - start).jd)
+
+    def b_at(offset_days: float) -> float:
+        time = start + TimeDelta(offset_days, format="jd", scale="tdb")
+        return _axis_state(
+            target=target,
+            time=time,
+            z_au=z_au,
+            link_direction=link_direction,
+            observer=observer,
+            ephemeris=ephemeris,
+            model=model,
+        ).b_au
+
+    offsets = [span_days * k / (coarse_samples - 1) for k in range(coarse_samples)]
+    values = [b_at(offset) for offset in offsets]
+    best = min(range(coarse_samples), key=lambda k: values[k])
+    lo = offsets[max(0, best - 1)]
+    hi = offsets[min(coarse_samples - 1, best + 1)]
+    tolerance_days = refine_tolerance_s / 86_400.0
+    offset = _golden_minimize(b_at, lo, hi, tolerance_days)
+
+    time = start + TimeDelta(offset, format="jd", scale="tdb")
+    sample = impact_parameter(
+        target=target,
+        time=time,
+        link_direction=link_direction,
+        observer=observer,
+        z_au=z_au,
+        ephemeris=ephemeris,
+        model=model,
+    )
+    boundary: str | None = None
+    if offset <= tolerance_days:
+        boundary = WARN_MINIMUM_AT_INTERVAL_START
+    elif offset >= span_days - tolerance_days:
+        boundary = WARN_MINIMUM_AT_INTERVAL_STOP
+    if boundary is None:
+        return sample
+    return replace(sample, warnings=(*sample.warnings, boundary))
+
+
 def find_crossings(
     request: CrossingsRequest,
     registry: TargetRegistry,
@@ -255,6 +336,22 @@ def find_crossings(
     targets = [registry[tid] for tid in request.target_ids]
     target_hashes = {target.target_id: stable_hash(target) for target in targets}
     crossings_id = _crossings_id(request, model, ephemeris, target_hashes)
+    target_providers = {}
+    for target in targets:
+        provider = resolve_target_state_provider(target)
+        target_providers[target.target_id] = (
+            provider.provider_id,
+            provider.provider_version,
+            provider.content_hash,
+        )
+    observer_state_provider = resolve_observer_state_provider(
+        request.observer, ephemeris
+    )
+    observer_provider = (
+        observer_state_provider.provider_id,
+        observer_state_provider.provider_version,
+        observer_state_provider.content_hash,
+    )
 
     events: list[CrossingEvent] = []
     invalid_count = 0
@@ -272,6 +369,8 @@ def find_crossings(
                         ephemeris=ephemeris,
                         crossings_id=crossings_id,
                         target_source_hash=target_hashes[target.target_id],
+                        target_provider=target_providers[target.target_id],
+                        observer_provider=observer_provider,
                     )
                 except EphemerisCoverageError as exc:
                     if strict:
@@ -291,6 +390,8 @@ def find_crossings(
                             ephemeris_id=ephemeris.ephemeris_id,
                             crossings_id=crossings_id,
                             target_source_hash=target_hashes[target.target_id],
+                            target_provider=target_providers[target.target_id],
+                            observer_provider=observer_provider,
                             reason=f"{WARN_EPHEMERIS_COVERAGE}: {exc}",
                         )
                     ]
@@ -364,6 +465,8 @@ def _scan_combination(
     ephemeris: Ephemeris,
     crossings_id: str,
     target_source_hash: str,
+    target_provider: tuple[str, str, str],
+    observer_provider: tuple[str, str, str],
 ) -> list[CrossingEvent]:
     start = interval.start.tdb
     span_days = float((interval.stop.tdb - start).jd)
@@ -435,6 +538,8 @@ def _scan_combination(
                 b_at=b_at,
                 crossings_id=crossings_id,
                 target_source_hash=target_source_hash,
+                target_provider=target_provider,
+                observer_provider=observer_provider,
                 ephemeris_id=ephemeris.ephemeris_id,
                 minimum_index=len(events),
             )
@@ -456,6 +561,8 @@ def _build_event(
     b_at: Callable[[float], float],
     crossings_id: str,
     target_source_hash: str,
+    target_provider: tuple[str, str, str],
+    observer_provider: tuple[str, str, str],
     ephemeris_id: str,
     minimum_index: int,
 ) -> CrossingEvent:
@@ -536,6 +643,12 @@ def _build_event(
         model_version=direction.model_version,
         target_source_hash=target_source_hash,
         ephemeris_id=ephemeris_id,
+        target_provider_id=target_provider[0],
+        target_provider_version=target_provider[1],
+        target_provider_hash=target_provider[2],
+        observer_provider_id=observer_provider[0],
+        observer_provider_version=observer_provider[1],
+        observer_provider_hash=observer_provider[2],
         validity=validity,
         uncertainty_method=UncertaintyMethod.NOT_PROPAGATED,
         side=BeamSide.TARGET if state.s_au >= 0.0 else BeamSide.ANTI_TARGET,
@@ -656,6 +769,8 @@ def _invalid_event(
     ephemeris_id: str,
     crossings_id: str,
     target_source_hash: str,
+    target_provider: tuple[str, str, str],
+    observer_provider: tuple[str, str, str],
     reason: str,
 ) -> CrossingEvent:
     """An explicitly invalid status row: NaN geometry, never fake values.
@@ -702,6 +817,12 @@ def _invalid_event(
         model_version=model.model_version,
         target_source_hash=target_source_hash,
         ephemeris_id=ephemeris_id,
+        target_provider_id=target_provider[0],
+        target_provider_version=target_provider[1],
+        target_provider_hash=target_provider[2],
+        observer_provider_id=observer_provider[0],
+        observer_provider_version=observer_provider[1],
+        observer_provider_hash=observer_provider[2],
         validity=Validity.INVALID,
         uncertainty_method=UncertaintyMethod.NOT_PROPAGATED,
         warnings=(reason,),

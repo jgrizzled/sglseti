@@ -39,3 +39,41 @@ coordinates, rates, visibility, planning) takes ~60 s.
   identity; none ships in v1 because the requirement is met without it.
 - Memory scales with the retained result (~15 KB/sample at peak here);
   chunked writing for larger-than-memory batches is a post-v1 concern.
+  (Addressed in v1.1 — see below.)
+
+## v1.1 archive-scale execution (roadmap §3.4)
+
+Measured 2026-08-18 on the same machine and library versions as above,
+with `benchmarks/archive_scale.py` (same NFR-004 configuration: astropy
+builtin ephemeris, Earth center, geometric ICRS only). Note on comparing
+against the rc1 table: `RESULT_SCHEMA_VERSION` 2 (rc2) added the
+segment-boundary coordinates, tripling the geometry evaluations per
+sample — re-measured at head-before-item-6.5, the reference small batch
+(4 targets x 2 roles x 25 epochs x 25 samples = 5,000 samples) ran at
+**90 samples/s**. With the v1.1 identity-keyed caches (providers by
+content hash, target states per TDB epoch, scalar ephemeris positions,
+site GCRS offsets — all pure and bit-identical, verified by the test
+suite):
+
+| Scenario | Result |
+|---|---|
+| Small batch, 5,000 samples | 13.0 s, **383 samples/s** (was 55.5 s / 90 samples/s: ~4.3x) |
+| Small batch, tabular spacecraft observer | 15.0 s, **333 samples/s** — Hermite table interpolation is not a bottleneck (measured 2026-08-18, item 6.11) |
+| NFR-004 batch, 250,000 samples | 675 s (~11.2 min), **370 samples/s** — rc1's 938 s produced one third of the geometry per row (schema v1) |
+| Vectorized `states_at` x500 epochs | 8 ms vs 700 ms scalar (~90x) |
+| Batch export, 250,000 rows (ECSV+CSV) | 58 s, python-heap peak **2.18 GB** |
+| Streaming export, 250,000 rows (CSV + 25k-row ECSV parts) | 57 s, python-heap peak **227 MB** (~10x lower) |
+| Monte Carlo locus uncertainty, 256 samples | ~1.0 s |
+| Full test suite | 18 s (was ~50 s before the caches) |
+
+Remaining hot spot: the rx role's per-distance catalog propagation
+(catalog epoch `t - 2z/c` differs for every relay distance, so the
+per-epoch state memo cannot collapse it; antipode/tx epochs are
+z-independent and fully cached). Vectorizing that inside the geometry
+model is the next lever if archive workloads need it.
+
+Deterministic chunking (`plan_calculation` + `iter_locus_chunks`) and the
+bounded-memory `write_samples_stream` writer make larger-than-memory
+batches practical: chunks arrive in the documented product order with
+unchanged identities, any index range is independently reproducible, and
+the streamed `samples.csv` is byte-identical to the batch writer's file.

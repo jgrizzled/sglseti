@@ -26,7 +26,7 @@ import csv
 import dataclasses
 import json
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -51,12 +51,13 @@ __all__ = [
     "result_manifest",
     "write_crossings_products",
     "write_products",
+    "write_samples_stream",
 ]
 
-RESULT_SCHEMA_VERSION = 2
+RESULT_SCHEMA_VERSION = 3
 
 #: Crossing event/window products carry their own schema counter.
-CROSSINGS_RESULT_SCHEMA_VERSION = 1
+CROSSINGS_RESULT_SCHEMA_VERSION = 2
 
 #: Fixed coordinate/time conventions recorded in every manifest (PRD §9.4).
 CONVENTIONS = {
@@ -107,6 +108,7 @@ def write_products(
     *,
     generated_utc: str,
     input_file_hashes: Mapping[str, str] | None = None,
+    source_revision: str | None = None,
 ) -> dict[str, Path]:
     """Write every requested format plus ``manifest.json``.
 
@@ -159,6 +161,10 @@ def write_products(
             written["pointings_csv"] = _write_csv(
                 output_dir / "pointings.csv", POINTING_COLUMNS, pointing_rows
             )
+    if OutputFormat.VOTABLE in formats:
+        written["samples_votable"] = _write_votable(
+            output_dir / "samples.vot", SAMPLE_COLUMNS, sample_rows, meta
+        )
     if OutputFormat.DS9 in formats:
         written["regions_ds9"] = _write_ds9(output_dir / "regions.ds9", result)
 
@@ -167,6 +173,7 @@ def write_products(
         generated_utc=generated_utc,
         input_file_hashes=input_file_hashes or {},
         output_files={label: file_sha256(path) for label, path in written.items()},
+        source_revision=source_revision,
     )
     manifest_path = output_dir / "manifest.json"
     manifest_path.write_text(
@@ -176,14 +183,117 @@ def write_products(
     return written
 
 
+def write_samples_stream(
+    corridors: Iterable[Corridor],
+    output_dir: str | Path,
+    *,
+    calculation_id: str,
+    model_id: str,
+    result_warnings: Sequence[str] = (),
+    rows_per_ecsv_part: int = 100_000,
+    write_csv: bool = True,
+    write_ecsv_parts: bool = True,
+) -> dict[str, Path]:
+    """Bounded-memory sample export from a corridor stream (roadmap §3.4).
+
+    Consumes corridors as they are produced (e.g. ``chunk.corridor`` from
+    :func:`sglseti.generate.iter_locus_chunks`) without ever holding the
+    full sample table:
+
+    - ``samples.csv`` is written row-by-row and is byte-identical to the
+      batch writer's file for the same corridors;
+    - ``samples-part-NNNNNN.ecsv`` files carry at most
+      ``rows_per_ecsv_part`` rows each, with the shared table metadata
+      plus ``part_index``/``part_row_offset`` bookkeeping — ECSV needs
+      whole-column type inference, so bounded memory means bounded parts
+      rather than one unbounded table;
+    - ``corridors.ecsv`` collects the per-corridor rows (smaller than the
+      sample table by the corridor size).
+
+    JSON, DS9, pointing, and manifest products remain batch writers.
+    """
+    if rows_per_ecsv_part < 1:
+        raise ValueError(
+            f"rows_per_ecsv_part must be positive, got {rows_per_ecsv_part}"
+        )
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    meta = {
+        "result_schema_version": RESULT_SCHEMA_VERSION,
+        "calculation_id": calculation_id,
+        "model_id": model_id,
+        "warnings": list(result_warnings),
+    }
+    written: dict[str, Path] = {}
+    corridor_rows: list[dict[str, Any]] = []
+    part_buffer: list[dict[str, Any]] = []
+    part_index = 0
+    row_count = 0
+
+    def flush_part() -> None:
+        nonlocal part_index
+        if not part_buffer:
+            return
+        path = output_dir / f"samples-part-{part_index:06d}.ecsv"
+        part_meta = dict(meta)
+        part_meta["part_index"] = part_index
+        part_meta["part_row_offset"] = row_count - len(part_buffer)
+        written[f"samples_ecsv_part_{part_index:06d}"] = _write_ecsv(
+            path, SAMPLE_COLUMNS, part_buffer, part_meta
+        )
+        part_buffer.clear()
+        part_index += 1
+
+    csv_handle = None
+    csv_writer = None
+    try:
+        if write_csv:
+            csv_path = output_dir / "samples.csv"
+            csv_handle = csv_path.open("w", newline="", encoding="utf-8")
+            csv_writer = csv.DictWriter(csv_handle, fieldnames=list(SAMPLE_COLUMNS))
+            csv_writer.writeheader()
+            written["samples_csv"] = csv_path
+        for corridor in corridors:
+            corridor_rows.append(_corridor_row(corridor))
+            for sample in corridor.samples:
+                row = _record_row(sample, corridor_id=corridor.corridor_id)
+                row_count += 1
+                if csv_writer is not None:
+                    csv_writer.writerow(
+                        {
+                            c: ("" if row.get(c) is None else row.get(c))
+                            for c in SAMPLE_COLUMNS
+                        }
+                    )
+                if write_ecsv_parts:
+                    part_buffer.append(row)
+                    if len(part_buffer) >= rows_per_ecsv_part:
+                        flush_part()
+        if write_ecsv_parts:
+            flush_part()
+    finally:
+        if csv_handle is not None:
+            csv_handle.close()
+    written["corridors_ecsv"] = _write_ecsv(
+        output_dir / "corridors.ecsv", CORRIDOR_COLUMNS, corridor_rows, meta
+    )
+    return written
+
+
 def result_manifest(
     result: CalculationResult,
     *,
     generated_utc: str,
     input_file_hashes: Mapping[str, str],
     output_files: Mapping[str, str],
+    source_revision: str | None = None,
 ) -> dict[str, Any]:
-    """Manifest with the science identity hashed apart from run metadata."""
+    """Manifest with the science identity hashed apart from run metadata.
+
+    ``source_revision`` (e.g. a git commit) is run metadata recorded when
+    the caller supplies it; the package version is always recorded via the
+    library-versions block (§3.5).
+    """
     science: dict[str, Any] = {
         "result_schema_version": RESULT_SCHEMA_VERSION,
         "calculation_id": result.calculation_id,
@@ -198,11 +308,27 @@ def result_manifest(
         },
         "ephemeris_ids": sorted({s.ephemeris_id for s in result.samples}),
         "iers_id": result.iers_id,
+        "target_state_providers": _provider_summary(
+            (s.target_id, s.target_provider_id, s.target_provider_version,
+             s.target_provider_hash)
+            for s in result.samples
+        ),
+        "observer_state_providers": _provider_summary(
+            (s.observer_id, s.observer_provider_id, s.observer_provider_version,
+             s.observer_provider_hash)
+            for s in result.samples
+        ),
+        "uncertainty": {
+            "method": _uncertainty_method(result),
+            "assumed_half_width_arcsec": result.request.assumed_half_width_arcsec,
+        },
+        "time_semantics": _time_semantics(result.request),
         "input_file_hashes": dict(sorted(input_file_hashes.items())),
         "conventions": CONVENTIONS,
     }
     run = {
         "generated_utc": generated_utc,
+        "source_revision": source_revision,
         "output_files": dict(sorted(output_files.items())),
         "warning_summary": list(result.warnings),
         "sample_count": len(result.samples),
@@ -213,6 +339,37 @@ def result_manifest(
     }
     manifest = build_manifest(science_inputs=science, run_metadata=run)
     return manifest
+
+
+def _provider_summary(rows: Any) -> dict[str, dict[str, str]]:
+    """{owner_id: {provider_id, provider_version, content_hash}}, sorted."""
+    summary: dict[str, dict[str, str]] = {}
+    for owner, provider_id, provider_version, content_hash in sorted(set(rows)):
+        summary[owner] = {
+            "provider_id": provider_id,
+            "provider_version": provider_version,
+            "content_hash": content_hash,
+        }
+    return summary
+
+
+def _uncertainty_method(result: CalculationResult) -> str:
+    methods = sorted({s.uncertainty_method.value for s in result.samples})
+    if len(methods) == 1:
+        return methods[0]
+    return (
+        "assumed"
+        if result.request.assumed_half_width_arcsec is not None
+        else "not_propagated"
+    )
+
+
+def _time_semantics(request: Any) -> str:
+    from .models import TimeIntervals
+
+    if isinstance(request.time, TimeIntervals):
+        return "observation_intervals (rows carry interval_id/phase/duration)"
+    return "instantaneous point epochs"
 
 
 def write_crossings_products(
@@ -264,6 +421,10 @@ def write_crossings_products(
         )
         written["windows_csv"] = _write_csv(
             output_dir / "windows.csv", WINDOW_COLUMNS, window_rows
+        )
+    if OutputFormat.VOTABLE in formats:
+        written["events_votable"] = _write_votable(
+            output_dir / "events.vot", EVENT_COLUMNS, event_rows, meta
         )
 
     manifest = crossings_manifest(
@@ -458,6 +619,28 @@ def _write_csv(path: Path, columns: Sequence[str], rows: list[dict[str, Any]]) -
             writer.writerow(
                 {c: ("" if row.get(c) is None else row.get(c)) for c in columns}
             )
+    return path
+
+
+def _write_votable(
+    path: Path,
+    columns: Sequence[str],
+    rows: list[dict[str, Any]],
+    meta: Mapping[str, Any],
+) -> Path:
+    """VOTable serialization of a row table (astropy's built-in writer)."""
+    from astropy.table import Table
+
+    data: dict[str, list[Any]] = {
+        column: [_ecsv_cell(row.get(column)) for row in rows] for column in columns
+    }
+    table = Table(data=data, names=list(columns))
+    for column in columns:
+        unit = _column_unit(column)
+        if unit is not None and len(rows):
+            table[column].unit = unit
+    table.meta.update(meta)
+    table.write(path, format="votable", overwrite=True)
     return path
 
 

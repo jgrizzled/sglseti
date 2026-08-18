@@ -33,6 +33,7 @@ from .models import (
     IersSpec,
     LinkDirection,
     ObservabilityConstraints,
+    ObservationInterval,
     Observer,
     ObserverKind,
     OutputFormat,
@@ -42,6 +43,7 @@ from .models import (
     SamplingSpec,
     TimeGrid,
     TimeInterval,
+    TimeIntervals,
     TimeList,
     TimeSingle,
     TimeSpec,
@@ -298,7 +300,7 @@ _TOP_KEYS = {
     "fov",
 }
 
-_TIME_MODE_KEYS = ("epoch_utc", "epochs", "epochs_file", "grid")
+_TIME_MODE_KEYS = ("epoch_utc", "epochs", "epochs_file", "grid", "intervals")
 
 
 def load_request(path: str | Path) -> GeometryRequest:
@@ -395,6 +397,39 @@ def _parse_time(raw: Any, base_dir: Path, fail: _Fail) -> TimeSpec:
         if not epochs_path.is_absolute():
             epochs_path = base_dir / epochs_path
         return TimeList(epochs=load_epoch_table(epochs_path))
+    if mode == "intervals":
+        raw_intervals = block["intervals"]
+        if not isinstance(raw_intervals, list) or not raw_intervals:
+            fail("time.intervals", "must be a non-empty list of interval mappings")
+        intervals: list[ObservationInterval] = []
+        for index, item in enumerate(raw_intervals):
+            ctx = f"time.intervals[{index}]"
+            entry = _mapping(item, ctx, fail)
+            _check_keys(
+                entry,
+                {"id", "start_utc", "stop_utc", "subintegration_cadence_s"},
+                ctx,
+                fail,
+            )
+            intervals.append(
+                _build(
+                    ctx,
+                    fail,
+                    ObservationInterval,
+                    interval_id=_string(entry, "id", ctx, fail),
+                    start=_parse_utc(entry.get("start_utc"), f"{ctx}.start_utc", fail),
+                    stop=_parse_utc(entry.get("stop_utc"), f"{ctx}.stop_utc", fail),
+                    subintegration_cadence_s=(
+                        _number(entry, "subintegration_cadence_s", ctx, fail)
+                        if "subintegration_cadence_s" in entry
+                        else None
+                    ),
+                )
+            )
+        spec_intervals: TimeIntervals = _build(
+            "time.intervals", fail, TimeIntervals, intervals=tuple(intervals)
+        )
+        return spec_intervals
     grid = _mapping(block["grid"], "time.grid", fail)
     _check_keys(grid, {"start_utc", "stop_utc", "cadence_s"}, "time.grid", fail)
     start = _parse_utc(grid.get("start_utc"), "time.grid.start_utc", fail)
@@ -448,18 +483,77 @@ def _parse_observer(raw: Any, fail: _Fail) -> Observer:
     if kind is ObserverKind.EARTH_CENTER:
         _check_keys(block, {"kind"}, "observer", fail)
         return Observer.earth_center()
-    _check_keys(
-        block, {"kind", "name", "longitude_deg", "latitude_deg", "height_m"}, "observer", fail
-    )
-    observer: Observer = _build(
+    observer: Observer
+    if kind is ObserverKind.SITE:
+        _check_keys(
+            block,
+            {"kind", "name", "longitude_deg", "latitude_deg", "height_m"},
+            "observer",
+            fail,
+        )
+        observer = _build(
+            "observer",
+            fail,
+            Observer,
+            observer_id=_string(block, "name", "observer", fail),
+            kind=ObserverKind.SITE,
+            longitude_deg=_number(block, "longitude_deg", "observer", fail),
+            latitude_deg=_number(block, "latitude_deg", "observer", fail),
+            height_m=_number(block, "height_m", "observer", fail),
+        )
+        return observer
+    # Provider-backed observer kinds (roadmap §2.4). File-backed specs may
+    # pin a content checksum; identities always use content, never path.
+    if kind is ObserverKind.SOLAR_SYSTEM_BODY:
+        _check_keys(block, {"kind", "name", "body"}, "observer", fail)
+        observer = _build(
+            "observer",
+            fail,
+            Observer,
+            observer_id=_string(block, "name", "observer", fail),
+            kind=kind,
+            body=_string(block, "body", "observer", fail).lower(),
+        )
+        return observer
+    if kind is ObserverKind.SPACECRAFT_TABLE:
+        _check_keys(block, {"kind", "name", "path", "checksum_sha256"}, "observer", fail)
+        observer = _build(
+            "observer",
+            fail,
+            Observer,
+            observer_id=_string(block, "name", "observer", fail),
+            kind=kind,
+            path=_string(block, "path", "observer", fail),
+            checksum_sha256=_string(block, "checksum_sha256", "observer", fail),
+        )
+        return observer
+    if kind is ObserverKind.SPACECRAFT_SPICE:
+        _check_keys(
+            block,
+            {"kind", "name", "path", "spice_target", "checksum_sha256"},
+            "observer",
+            fail,
+        )
+        observer = _build(
+            "observer",
+            fail,
+            Observer,
+            observer_id=_string(block, "name", "observer", fail),
+            kind=kind,
+            path=_string(block, "path", "observer", fail),
+            spice_target=_string(block, "spice_target", "observer", fail),
+            checksum_sha256=_string(block, "checksum_sha256", "observer", fail),
+        )
+        return observer
+    assert kind is ObserverKind.PROGRAMMATIC
+    _check_keys(block, {"kind", "name", "identity"}, "observer", fail)
+    observer = _build(
         "observer",
         fail,
         Observer,
         observer_id=_string(block, "name", "observer", fail),
-        kind=ObserverKind.SITE,
-        longitude_deg=_number(block, "longitude_deg", "observer", fail),
-        latitude_deg=_number(block, "latitude_deg", "observer", fail),
-        height_m=_number(block, "height_m", "observer", fail),
+        kind=kind,
+        identity=_string(block, "identity", "observer", fail),
     )
     return observer
 

@@ -16,8 +16,10 @@ COUNT_25 = SamplingSpec(kind=SamplingKind.COUNT, count=25)
 
 # Golden identities: frozen so an accidental change to the ID payload or the
 # canonical schema is loud. Never refresh without a documented reason.
-GOLDEN_FIRST_SEGMENT_ID = "seg-15138ee11203"
-GOLDEN_TABLE_HASH = "sha256:455e97259cc72721fa7d38f6b874a2a43fa133f2c1a76f5742802764f7b8c09c"
+# Re-baselined 2026-08-18 for canonical schema v2 (greenfield identity
+# baseline; see test_provenance.py).
+GOLDEN_FIRST_SEGMENT_ID = "seg-9baa5e35104c"
+GOLDEN_TABLE_HASH = "sha256:31aa78f28b334e6fad4363d682a36e9933badbda9987a8c502369c684b5bbabe"
 
 
 def barnard_rx(sampling: SamplingSpec = COUNT_25, relay_range: RelayRange = RANGE):

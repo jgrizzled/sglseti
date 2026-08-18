@@ -24,11 +24,14 @@ EXAMPLES = Path(__file__).resolve().parents[2] / "examples"
 # Golden digest: freezes the canonical schema. If this test fails, the hash
 # schema changed — bump CANONICAL_SCHEMA_VERSION and document the migration;
 # never just update the string.
-GOLDEN_HASH_A1 = "sha256:e9bf54475d25f27c09fad24f68e495aa342a2621b2dadb7046cc303dc7eeac3e"
+# Re-baselined 2026-08-18 for canonical schema v2 (the greenfield identity
+# baseline adopted before first archival use); the version is part of the
+# hashed envelope, so the bump moved every hash exactly once.
+GOLDEN_HASH_A1 = "sha256:e49622992a3e20ca18fad0689ef2bcf5865151150e1ee9c65d0d349ebbbe9558"
 
 
 def test_golden_hash_schema_v1() -> None:
-    assert CANONICAL_SCHEMA_VERSION == 1
+    assert CANONICAL_SCHEMA_VERSION == 2
     assert stable_hash({"a": 1}) == GOLDEN_HASH_A1
 
 

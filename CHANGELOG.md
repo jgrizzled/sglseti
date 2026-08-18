@@ -7,7 +7,230 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Greenfield identity baseline (2026-08-18, adopted before first
+  operational use; supersedes the interim compatibility notes in the
+  entries below). Canonical schema v2: dataclass fields equal to their
+  declared default are omitted from identities — adding a defaulted field
+  to any record can never move existing hashes (the flip side, accepted
+  deliberately: changing a scientific field's DEFAULT is an
+  identity-relevant change requiring a canonical schema bump) — and
+  fields named `path` never enter identities; file-backed resources
+  contribute pinned content checksums, which are now REQUIRED on
+  spacecraft observer specs and sampled-state specs. The per-class
+  `__canonical__` compatibility hooks, the observer-identity substitution
+  machinery, and the ephemeris path-stripping special case are deleted in
+  favor of these two generic rules. The target registry is a SINGLE
+  schema (`schema_version: 2`); the v1 registry format, its dual loader,
+  and the lowest-schema normalization mechanism are removed (there are no
+  v1 registries to migrate). Every hash moved exactly once with the
+  canonical bump; this is the frozen baseline archival consumers build
+  on.
+
 ### Added
+
+- Published accuracy budget (v1.1 roadmap item 6.12 / improvements §2.5;
+  `docs/accuracy_budget.md`): the geometric-pointing error budget by
+  model, observer type, epoch span, and target-state provider, separating
+  declared model approximations, measured resource floors, and
+  propagated input uncertainty, with scaling laws for untabulated
+  configurations. Cited numbers are pinned by
+  `tests/regression/test_accuracy_budget.py`: the builtin-vs-kernel
+  relay-pointing floor is <= 0.02 mas (the geometry depends on the
+  Earth-Sun relative vector, cancelling ~119 km of absolute analytic
+  ephemeris error), the tx-epoch amplification law mu*2d/c is verified to
+  1 percent (~74 arcsec for Wolf 359), spacecraft displacement maps to
+  delta/rho exactly (0.01 AU at 550 AU = 3.76 arcsec), and the neglected
+  solar-motion class is bounded by v_sun/c ~ 11 mas, consistent with the
+  measured Horizons light-time residual. This closes all three §2.5
+  science gates.
+
+- Spacecraft crossing verification and benchmark (v1.1 roadmap item 6.11
+  / improvements §3.3, §3.4). Regression tests run the real Wolf 359
+  outbound-beam scenario on the pinned DE440s kernel with tabular
+  spacecraft observers (kernel Earth plus a fixed displacement) and pin
+  two physical invariants of the beam-axis geometry: a displacement ALONG
+  the axis leaves the crossing epoch and impact parameter unchanged
+  (< 2e-6 AU / < 10 min), while a CROSS-axis displacement shifts the
+  crossing by exactly its magnitude, split between `b_min` and
+  `v_perp * dt` (verified to 10%). The uncertainty-aware crossing
+  distribution, the observation-interval impact minimum, and the
+  point-query API all compose with spacecraft observers. Benchmarks gain
+  the spacecraft row: 333 vs 368 samples/s at the reference batch —
+  Hermite table interpolation is not a bottleneck.
+
+- Result schema v3 and crossings schema v2 (v1.1 roadmap item 6.10 /
+  improvements §3.5). Every sample row and crossing event now identifies
+  the adopted solutions behind it: target- and observer-state provider
+  ID, version, and content hash (closing §2.1's final acceptance
+  criterion), on valid and invalid status rows alike. Requests gain a
+  first-class `intervals` time mode (§3.1): each observation interval
+  materializes into labeled sample times — `<interval_id>@start|mid|stop`
+  or the declared subintegration grid — and rows carry `interval_id`,
+  `interval_phase`, and `interval_duration_s`. Manifests add per-owner
+  provider summaries, an `uncertainty` block, declared `time_semantics`,
+  and an optional caller-supplied `source_revision` alongside the
+  recorded package version — run metadata, never science identity.
+  `votable` joins the output formats (`samples.vot` / `events.vot` via
+  astropy's built-in writer, units preserved). MOC/ST-MOC envelope
+  export is deliberately deferred: coverage products belong to the survey
+  consumer (improvements §5).
+
+- `sampled_state_v1` target-state family (v1.1 roadmap item 6.9 /
+  improvements §2.1): externally generated, CHECKSUMMED cartesian
+  ephemerides of the endpoint itself. The registry-v2 `sampled_state`
+  block requires the content checksum (identities use it, never the
+  path), declares its epoch semantics (`ssb_light_arrival_time` |
+  `physical_event_time` — the v1 geometry model explicitly refuses the
+  latter) and its source; interpolation is declared (cubic Hermite with
+  velocity columns, linear otherwise) on table machinery shared with the
+  spacecraft observer family; epochs outside the tabulated span become
+  invalid status rows; a load-time consistency guard rejects tables
+  pointing more than 1 degree from the linearly propagated reference
+  astrometry (wrong-file protection); and parameter-based Monte Carlo
+  uncertainty sampling refuses sampled targets explicitly. This is the
+  only family that models `planet` endpoints, closing §2.1's
+  moving-endpoint gap.
+- Observer-state provider families (v1.1 roadmap item 6.8 / improvements
+  §2.4). The `Observer` spec (and request YAML) now selects among six
+  kinds: the existing Earth center and terrestrial site, plus
+  `solar_system_body` (any body the pinned planetary ephemeris serves,
+  via the new `Ephemeris.body_barycentric_au`), `spacecraft_table` (a
+  checksummed tabular ECSV ephemeris with declared interpolation — cubic
+  Hermite when velocity columns are present, linear otherwise — and
+  coverage errors outside the tabulated span), `spacecraft_spice` (a
+  SPICE SPK kernel via the optional `spiceypy` dependency; geometric
+  states in the SPICE J2000 frame with the ~17 mas ICRS frame bias
+  declared, SPK coverage windows enforced), and `programmatic` (a
+  runtime-registered state function —
+  `register_programmatic_observer()` — with a caller-declared content
+  identity). Calculation IDs and manifests record the path-free CONTENT
+  identity of file-backed observers, never a local path, and are
+  verified path-independent (see the greenfield identity baseline entry
+  above for the final mechanism). Crossing searches compose with the new observers through
+  the provider layer unchanged.
+
+- Science gates, first tranche (v1.1 roadmap item 6.7 / improvements
+  §2.5). Frozen Wolf 359 crossing regression: an independent no-sglseti
+  oracle on the pinned DE440s excerpt kernel reproduces the Gillon,
+  Burdanov & Wright 2022 outbound-beam geometry, and the +10.6 h (2015) /
+  +17.0 h (2019) offsets from the paper's published crossing epochs are
+  asserted as the EXPECTED result — at the published epochs the Earth
+  sits 1.78 / 2.70 R_sun off-axis, outside the paper's own 1.1 R_sun
+  annulus — with ~2 arcsec publication consistency on the TRAPPIST-South
+  tx pointing. Frozen JPL Horizons cross-validation (one-time online
+  fetch, offline tests): the pinned kernel matches DE441 barycentric
+  vectors to sub-meter and the builtin analytic ephemeris to ~119 km;
+  the light-time-retarded solar direction from the geocenter and the
+  Green Bank site matches Horizons astrometric coordinates to
+  0.002 / 0.009 mas, validating the ephemeris + observer + direction
+  pipeline end-to-end, while the ~9 mas residual of the unretarded
+  geometric direction is asserted as the measured scale of the
+  deliberately omitted light-time term. The continuation plan for the
+  remaining roadmap work is recorded as improvements-note §6 items 7-13.
+
+- Archive-scale execution: caching, chunking, vectorization, streaming
+  (v1.1 roadmap item 6.5). Identity-keyed, bounded, bit-identical
+  memoization throughout the hot path: providers by target content hash,
+  propagated target states per TDB epoch, scalar ephemeris body positions,
+  and site GCRS offsets (`clear_provider_cache()` /
+  `provider_cache_stats()` manage it) — batch generation runs ~4.3x
+  faster at the reference configuration with unchanged outputs.
+  `plan_calculation()` + `iter_locus_chunks()` expose deterministic
+  chunked execution: one corridor per target/role/epoch in the documented
+  product order, sliceable by chunk index with unchanged identities
+  (`generate_loci()` is now built on the same path). Providers gain
+  vectorized `states_at()` (one `apply_space_motion` for many epochs,
+  elementwise bit-identical, ~85x) and observers `positions_au()`.
+  `write_samples_stream()` writes `samples.csv` row-by-row
+  (byte-identical to the batch writer) plus bounded ECSV parts from the
+  chunk stream, so exports never materialize the full sample table.
+  Benchmarks: `benchmarks/archive_scale.py`; measurements in
+  `docs/benchmarks.md`.
+
+- Propagated uncertainty and uncertainty-aware crossings (v1.1 roadmap
+  item 6.4; `sglseti.uncertainty`, plus
+  `sglseti.crossings.minimize_impact_parameter`). Seeded Monte Carlo
+  propagation of registry-v2 target uncertainties:
+  `target_uncertainty()` assembles the sampling covariance from per-value
+  uncertainties and covariance/correlation matrices with exact unit
+  validation (Gaia tangent-plane convention); `draw_target_samples()`
+  draws fully validated perturbed targets, rejecting domain-violating
+  draws (the explicit non-Gaussian treatment — orbital elements pass
+  through Kepler's equation to empirical percentiles);
+  `propagate_locus_uncertainty()` reports the nominal direction,
+  per-sample sky offsets for region construction, a declared confidence
+  level with its empirical confidence radius, sky covariance,
+  along/cross-track sigmas, explicit contribution labels (target state
+  propagated; observer state, ephemeris, and model floors declared
+  not-propagated), and surfaced degraded/invalid sample counts;
+  `crossing_uncertainty()` re-minimizes the impact parameter per sample
+  in a window around a nominal crossing event, yielding empirical bounds
+  and sigmas on `b_min`, closest-approach time, and transverse speed,
+  plus side-of-axis stability, with window-edge minima degrading the
+  product explicitly. `minimize_impact_parameter()` minimizes `b(t)` over
+  an `ObservationInterval` for schedule joins without a multi-year scan.
+  Every propagated product records seed, sample count, and confidence
+  level, and carries `UncertaintyMethod.PROPAGATED` — structurally
+  distinct from an assumed search pad.
+
+- Observation intervals and the continuous/adaptive locus API (v1.1
+  roadmap item 6.3; `sglseti.locus`). `ObservationInterval` makes an
+  archival observation a first-class span (start/midpoint/stop, duration,
+  optional subintegration cadence, pass-through metadata) while point
+  epochs stay fully supported. `evaluate_locus()` exposes the continuous
+  mapping `(target, role, observation time, observer, z) -> direction`;
+  `adaptive_locus()` returns an ordered, z-mapped polyline whose angular
+  deviation from the continuous locus is bounded by a caller-selected
+  tolerance (probe-accepted at half tolerance; budget exhaustion attaches
+  an explicit warning, and the achieved probe deviation is recorded);
+  `swept_locus()` builds a conservative swept envelope over an
+  observation interval with a declared `envelope_pad_arcsec`;
+  `covered_z_intervals()` refines an opaque caller-supplied
+  `contains(ra_deg, dec_deg)` footprint test into covered relay-distance
+  intervals with verified-covered endpoints — archive footprint schemas
+  never enter the package; and `interval_states()` reports position and
+  motion rates at an interval's representative or subintegration times.
+
+- Target registry schema v2 and orbital target-state families (v1.1
+  roadmap item 6.2). Schema v2 (`docs/registry.md`,
+  `examples/targets_v2.yaml`) adds explicit target-state provider
+  selection, immutable catalog/literature identifiers with release
+  versions, per-value provenance with 1-sigma uncertainties and mandatory
+  units, full covariance/correlation matrices with a declared parameter
+  ordering, and `quality` / `model_rationale` metadata. Two new provider
+  families implement motion the linear baseline refuses:
+  `acceleration_astrometry_v1` (catalog quadratic proper-motion terms)
+  and `two_body_orbit_v1` (resolved components and system barycenters
+  from a published Campbell orbit about a linearly propagating
+  barycenter, with declared approximations). Registry validation is
+  provider-aware: `accelerating_system` / `unresolved_binary` flags stay
+  errors for linear targets but are accepted by the richer families, and
+  orbit/endpoint coherence is enforced. (The v1 schema and its
+  migration path were later removed by the greenfield decision above;
+  the registry has a single schema.) The `two_body_orbit_v1` family is
+  verified against the published Alpha Centauri AB (Pourbaix & Boffin
+  2016) and Sirius AB (Bond et al. 2017) solutions via an independent
+  Thiele-Innes/bisection reference implementation
+  (`tests/data/reference/two_body_orbit_reference.py`), including the
+  observed ~4 arcsec Alpha Cen separation in 2016 and ~11 arcsec Sirius
+  maximum near the 2019.64 apastron.
+
+- Target-state and observer-state provider protocols
+  (`sglseti.providers`; v1.1 roadmap item 6.1). `TargetStateProvider`
+  and `ObserverStateProvider` define versioned, metadata-declaring
+  interfaces (epoch semantics, frame, origin, validity interval /
+  coverage, uncertainty / interpolation policy, and path-independent
+  content identity) behind which richer endpoint and observer models can
+  be added without touching the geometry core. Baseline families
+  `linear_astrometry_v1`, `earth_center_v1`, and `terrestrial_site_v1`
+  reproduce the previous inline behavior exactly — the geometry core now
+  consumes catalog propagation and observer positions through
+  `resolve_target_state_provider()` / `resolve_observer_state_provider()`,
+  and all existing fixtures are numerically unchanged. The
+  `tusay2022_eq5_7_v1` model additionally rejects providers whose epoch
+  semantics are not SSB light-arrival indexed.
 
 - Beam-crossing search (`sglseti crossings`, `find_crossings()`,
   `impact_parameter()`): finds when an observer passes closest to a

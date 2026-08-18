@@ -12,7 +12,12 @@ scientific change must change the hash. The rules (implementation of plan
   identities;
 - enums serialize as their values;
 - dataclasses serialize with their class name, so two record types with the
-  same field values stay distinct;
+  same field values stay distinct; fields equal to their declared default
+  are OMITTED, so adding a defaulted field to a record never moves existing
+  identities (the flip side, deliberately accepted: changing a scientific
+  field's DEFAULT is an identity-relevant change and requires a canonical
+  schema bump); fields named ``path`` are omitted — resource locations
+  never enter identities, their content checksums do;
 - astropy ``Time`` normalizes to a TDB ISO string at nanosecond precision
   (UTC/TDB expressions of one instant hash equally);
 - astropy ``Quantity`` normalizes to SI-decomposed unit/value pairs
@@ -52,7 +57,7 @@ __all__ = [
     "stable_id",
 ]
 
-CANONICAL_SCHEMA_VERSION = 1
+CANONICAL_SCHEMA_VERSION = 2
 MANIFEST_SCHEMA_VERSION = 1
 
 
@@ -80,13 +85,24 @@ def canonicalize(value: Any) -> Any:
             "content with file_sha256() instead"
         )
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
-        return {
-            "__dataclass__": type(value).__name__,
-            "fields": {
-                field.name: canonicalize(getattr(value, field.name))
-                for field in dataclasses.fields(value)
-            },
-        }
+        fields: dict[str, Any] = {}
+        for field in dataclasses.fields(value):
+            if field.name == "path":
+                continue  # locations never enter identities; checksums do
+            item = getattr(value, field.name)
+            if field.default is not dataclasses.MISSING:
+                if field.default is None:
+                    if item is None:
+                        continue
+                elif item == field.default:
+                    continue
+            elif (
+                field.default_factory is not dataclasses.MISSING
+                and item == field.default_factory()
+            ):
+                continue
+            fields[field.name] = canonicalize(item)
+        return {"__dataclass__": type(value).__name__, "fields": fields}
     if _is_astropy_time(value):
         return {"__time__": _normalize_time(value)}
     if _is_astropy_quantity(value):
@@ -137,29 +153,13 @@ def stable_id(prefix: str, value: Any) -> str:
 def request_id(request: Any) -> str:
     """Stable identity of a calculation request (``req-`` prefix).
 
-    Path-independent: epochs are held resolved (never as file references),
-    and an ephemeris ``path`` is stripped from the identity — a file-backed
-    ephemeris contributes through its content checksum, not its location.
+    Path-independent by the canonical rules: epochs are held resolved
+    (never as file references) and ``path`` fields never enter identities —
+    file-backed resources contribute through their pinned content
+    checksums (calculation IDs additionally substitute RESOLVED resource
+    identities for unpinned specs).
     """
-    canonical = canonicalize(request)
-    _strip_ephemeris_path(canonical)
-    return stable_id("req", canonical)
-
-
-def _strip_ephemeris_path(canonical: Any) -> None:
-    """Remove a canonicalized EphemerisSpec's ``path`` in place, if present."""
-    if isinstance(canonical, list):
-        for item in canonical:
-            _strip_ephemeris_path(item)
-        return
-    if not isinstance(canonical, dict):
-        return
-    fields = canonical.get("fields")
-    if canonical.get("__dataclass__") == "EphemerisSpec" and isinstance(fields, dict):
-        fields.pop("path", None)
-        return
-    for value in canonical.values():
-        _strip_ephemeris_path(value)
+    return stable_id("req", request)
 
 
 def file_sha256(path: str | Path) -> str:

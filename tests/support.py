@@ -74,6 +74,67 @@ class FakeEphemeris:
         self._check(time)
         return self._moon.copy()
 
+    def body_barycentric_au(self, body: str, time: Any) -> Any:
+        known = {"sun": self._sun, "earth": self._earth, "moon": self._moon}
+        if body not in known:
+            from sglseti.errors import EphemerisError
+
+            raise EphemerisError(f"fake ephemeris has no body {body!r}")
+        self._check(time)
+        return known[body].copy()
+
+
+class MovingEphemeris:
+    """Earth drifting linearly in time from a base epoch; fixed Sun.
+
+    Deterministic time-varying geometry for locus sweeps and crossing
+    scenarios without real ephemeris cost. ``base_earth_au`` and ``sun_au``
+    let a test place the observer track anywhere relative to a beam axis.
+    """
+
+    ephemeris_id = "moving_fake_ephemeris"
+
+    def __init__(
+        self,
+        velocity_au_per_day: tuple[float, float, float],
+        *,
+        base_time: Any,
+        base_earth_au: tuple[float, float, float] = (0.558, -0.744, -0.323),
+        sun_au: tuple[float, float, float] = (0.004, -0.002, 0.001),
+    ) -> None:
+        import numpy as np
+
+        self._velocity = np.asarray(velocity_au_per_day, dtype=float)
+        self._base_time = base_time
+        self._base = np.asarray(base_earth_au, dtype=float)
+        self._sun = np.asarray(sun_au, dtype=float)
+
+    def _earth(self, time: Any) -> Any:
+        dt_days = float((time.tdb - self._base_time.tdb).jd)
+        return self._base + self._velocity * dt_days
+
+    def sun_barycentric_au(self, time: Any) -> Any:
+        return self._sun.copy()
+
+    def earth_barycentric_au(self, time: Any) -> Any:
+        return self._earth(time)
+
+    def moon_barycentric_au(self, time: Any) -> Any:
+        import numpy as np
+
+        return self._earth(time) + np.array([0.00257, 0.0, 0.0])
+
+    def body_barycentric_au(self, body: str, time: Any) -> Any:
+        if body == "sun":
+            return self.sun_barycentric_au(time)
+        if body == "earth":
+            return self.earth_barycentric_au(time)
+        if body == "moon":
+            return self.moon_barycentric_au(time)
+        from sglseti.errors import EphemerisError
+
+        raise EphemerisError(f"moving fake ephemeris has no body {body!r}")
+
 
 def make_locus_sample(**overrides: Any) -> Any:
     """A valid LocusSample with plausible defaults, for pure-logic tests."""
@@ -106,6 +167,12 @@ def make_locus_sample(**overrides: Any) -> Any:
         icrs_ra_deg=39.85,
         icrs_dec_deg=60.90,
         observer_id="test-site",
+        target_provider_id="linear_astrometry_v1",
+        target_provider_version="1.0.0",
+        target_provider_hash="sha256:test-target-provider",
+        observer_provider_id="terrestrial_site_v1",
+        observer_provider_version="1.0.0",
+        observer_provider_hash="sha256:test-observer-provider",
         model_id="tusay2022_eq5_7_v1",
         model_version="1.1.0",
         target_source_hash="sha256:test",

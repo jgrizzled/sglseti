@@ -94,7 +94,7 @@ def test_validate_targets_invalid_file_exits_2(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     bad = tmp_path / "targets.yaml"
-    bad.write_text("schema_version: 1\ntargets: {}\n", encoding="utf-8")
+    bad.write_text("schema_version: 2\ntargets: {}\n", encoding="utf-8")
     assert main(["validate", "targets", str(bad)]) == 2
     err = capsys.readouterr().err
     assert err.startswith("error: ")
@@ -136,20 +136,22 @@ def test_validate_targets_allow_missing_rv(
     registry = tmp_path / "targets.yaml"
     registry.write_text(
         """
-schema_version: 1
+schema_version: 2
 targets:
   test-star:
     endpoint_kind: star
-    astrometry:
-      frame: icrs
-      ra_deg: 10.0
-      dec_deg: 10.0
-      parallax_mas: 100.0
-      pm_ra_cosdec_mas_per_yr: 0.0
-      pm_dec_mas_per_yr: 0.0
-      reference_epoch_jyear: 2016.0
-      reference_epoch_scale: tcb
-      source: example snapshot
+    state:
+      provider: linear_astrometry_v1
+      astrometry:
+        frame: icrs
+        ra_deg: 10.0
+        dec_deg: 10.0
+        parallax_mas: 100.0
+        pm_ra_cosdec_mas_per_yr: 0.0
+        pm_dec_mas_per_yr: 0.0
+        reference_epoch_jyear: 2016.0
+        reference_epoch_scale: tcb
+        source: example snapshot
 """,
         encoding="utf-8",
     )

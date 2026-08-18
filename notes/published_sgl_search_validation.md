@@ -96,7 +96,14 @@ target from the SIMBAD row above and ran:
   crossing epoch from the TRAPPIST-South site (-70.7403, -29.2563, 2347 m),
   compared against the published field center.
 
-A frozen regression fixture in the style of `alpha_cen_2021-11-06.yaml`
-(reproducibility vs an independent reference script + publication
-consistency on the pointing only, with the crossing-epoch disagreement
-documented as expected) has not been added yet.
+A frozen regression fixture now exists (added 2026-08-18):
+`tests/data/reference/wolf359_crossing_reference.py` regenerates
+`wolf359_crossing_reference.yaml`, and
+`tests/regression/test_wolf359_crossing_fixture.py` asserts (1) engine
+reproducibility against the independent oracle, (2) the crossing-epoch
+disagreement as the explicit EXPECTED result, and (3) publication
+consistency on the TRAPPIST-South pointing. The fixture uses the pinned
+DE440s excerpt kernel rather than the builtin ephemeris used for the
+table above; the kernel refines the off-axis distances at the published
+epochs to 1.78 R_sun (2015) and 2.70 R_sun (2019) — still well outside
+the 1.1 R_sun annulus, so the conclusion is unchanged.

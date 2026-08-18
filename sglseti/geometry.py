@@ -21,7 +21,10 @@ ADR-0001):
   warning codes; ``invalid`` is reserved for results that cannot be
   interpreted at all (e.g. ephemeris out of coverage).
 
-The observer's barycentric position is the ephemeris Earth barycenter plus
+Catalog propagation and the observer's barycentric position are delegated
+to the versioned state providers in :mod:`sglseti.providers` (roadmap item
+6.1). The baselines preserve the previous inline behavior exactly: linear
+``apply_space_motion`` propagation, and the ephemeris Earth barycenter plus
 the site's GCRS position vector treated as an ICRS-axis offset (< 1 mas
 effect; validated against the Phase 0 reference script).
 
@@ -33,7 +36,6 @@ layers) — this is the geometry-heavy module.
 from __future__ import annotations
 
 import math
-import warnings as _warnings
 from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
@@ -42,7 +44,6 @@ from astropy import units as u
 from astropy.coordinates import (
     CIRS,
     AltAz,
-    Distance,
     EarthLocation,
     SkyCoord,
 )
@@ -57,6 +58,13 @@ from .models import (
     Target,
     TargetEventKind,
     Validity,
+)
+from .providers import (
+    EPOCH_SEMANTICS_SSB_LIGHT_ARRIVAL,
+    LINEAR_PROPAGATION_SPAN_YEARS,
+    WARN_MISSING_RV,
+    resolve_observer_state_provider,
+    resolve_target_state_provider,
 )
 
 __all__ = [
@@ -96,12 +104,12 @@ SOLAR_FOCAL_MIN_AU = 547.7575534823646
 #: with ``outside_search_prior``, never ``invalid``.
 Z_OVER_D_SEARCH_PRIOR_FRACTION = 0.1
 
-#: Preliminary linear-motion validity bound (geometry_models.md §5).
-PROPAGATION_SPAN_WARN_YEARS = 75.0
+#: Preliminary linear-motion validity bound (geometry_models.md §5), now
+#: declared by the linear provider family and re-exported here.
+PROPAGATION_SPAN_WARN_YEARS = LINEAR_PROPAGATION_SPAN_YEARS
 
 WARN_BELOW_FOCAL = "below_solar_focal_minimum"
 WARN_LONG_SPAN = "long_propagation_span"
-WARN_MISSING_RV = "missing_radial_velocity"
 WARN_OUTSIDE_SEARCH_PRIOR = "outside_search_prior"
 
 
@@ -198,16 +206,20 @@ class Tusay2022Eq57V1:
         z_au = float(relay_distance_au)
         if z_au <= 0.0 or not math.isfinite(z_au):
             raise ValueError(f"relay distance must be positive and finite, got {z_au}")
-        warnings: list[str] = []
-        catalog = _catalog_coord(target, warnings)
+        provider = resolve_target_state_provider(target)
+        if provider.epoch_semantics != EPOCH_SEMANTICS_SSB_LIGHT_ARRIVAL:
+            raise ValueError(
+                "this model propagates SSB light-arrival-indexed catalog "
+                f"states; provider {provider.provider_id!r} declares epoch "
+                f"semantics {provider.epoch_semantics!r}"
+            )
+        warnings: list[str] = list(provider.warnings)
 
         t_tdb = observation_time.tdb
-        with _warnings.catch_warnings(record=True) as caught:
-            _warnings.simplefilter("always")
-            at_t_o = catalog.apply_space_motion(new_obstime=t_tdb)
-        warnings.extend(f"astropy:{w.message}" for w in caught)
+        at_t_o = provider.state_at(t_tdb)
+        warnings.extend(at_t_o.warnings)
 
-        d_au = float(at_t_o.distance.to_value(u.au))
+        d_au = at_t_o.distance_au
         d_days = d_au / C_AU_PER_DAY
         z_days = z_au / C_AU_PER_DAY
 
@@ -234,10 +246,8 @@ class Tusay2022Eq57V1:
             propagated = None
 
         if propagated is None:
-            with _warnings.catch_warnings(record=True) as caught:
-                _warnings.simplefilter("always")
-                propagated = catalog.apply_space_motion(new_obstime=catalog_epoch)
-            warnings.extend(f"astropy:{w.message}" for w in caught)
+            propagated = provider.state_at(catalog_epoch)
+            warnings.extend(propagated.warnings)
 
         validity = Validity.VALID
         if any(w == WARN_MISSING_RV for w in warnings):
@@ -248,8 +258,8 @@ class Tusay2022Eq57V1:
         if z_au < solar_focal_min_au(d_au):
             warnings.append(WARN_BELOW_FOCAL)
             validity = Validity.DEGRADED if validity is Validity.VALID else validity
-        span_years = abs((catalog_epoch - catalog.obstime.tdb).to_value(u.yr))
-        if span_years > PROPAGATION_SPAN_WARN_YEARS:
+        span_years = provider.propagation_span_years(catalog_epoch)
+        if span_years is not None and span_years > PROPAGATION_SPAN_WARN_YEARS:
             warnings.append(WARN_LONG_SPAN)
             validity = Validity.DEGRADED if validity is Validity.VALID else validity
         # Study search prior, not a physical bound (finding 6): the result
@@ -272,64 +282,19 @@ class Tusay2022Eq57V1:
             target_light_time_days=d_days,
             sun_relay_light_time_days=z_days,
             observer_relay_light_time_days_approx=z_days,  # rho = z assumed
-            target_direction_icrs_ra_deg=float(propagated.ra.deg),
-            target_direction_icrs_dec_deg=float(propagated.dec.deg),
+            target_direction_icrs_ra_deg=propagated.ra_deg,
+            target_direction_icrs_dec_deg=propagated.dec_deg,
             validity=validity,
             warnings=tuple(warnings),
         )
 
 
-def _catalog_coord(target: Target, warnings: list[str]) -> SkyCoord:
-    """Build the catalog SkyCoord honoring the declared reference scale.
-
-    A flagged missing radial velocity propagates as zero with an explicit
-    warning and degraded validity — never silently.
-    """
-    state = target.astrometry
-    if state.parallax_mas is not None:
-        distance = Distance(parallax=state.parallax_mas * u.mas)
-    else:
-        assert state.distance_pc is not None
-        distance = Distance(state.distance_pc * u.pc)
-    radial_velocity = state.radial_velocity_km_s
-    if radial_velocity is None:
-        warnings.append(WARN_MISSING_RV)
-        radial_velocity = 0.0
-    reference_epoch = Time(
-        state.reference_epoch_jyear,
-        format="jyear",
-        scale=state.reference_epoch_scale,
-    )
-    return SkyCoord(
-        ra=state.ra_deg * u.deg,
-        dec=state.dec_deg * u.deg,
-        distance=distance,
-        pm_ra_cosdec=state.pm_ra_cosdec_mas_per_yr * u.mas / u.yr,
-        pm_dec=state.pm_dec_mas_per_yr * u.mas / u.yr,
-        radial_velocity=radial_velocity * u.km / u.s,
-        obstime=reference_epoch,
-        frame="icrs",
-    )
-
-
 def observer_barycentric_au(
     observer: Observer, time: Time, ephemeris: Ephemeris
 ) -> np.ndarray:
-    """Barycentric ICRS position of the observer in AU."""
-    earth: np.ndarray = np.asarray(ephemeris.earth_barycentric_au(time), dtype=float)
-    if observer.kind is ObserverKind.EARTH_CENTER:
-        return earth
-    assert observer.longitude_deg is not None
-    location = EarthLocation.from_geodetic(
-        lon=observer.longitude_deg * u.deg,
-        lat=observer.latitude_deg * u.deg,
-        height=observer.height_m * u.m,
-    )
-    with offline_resources():
-        site_gcrs = location.get_gcrs_posvel(time)[0]
-    site_offset: np.ndarray = np.asarray(site_gcrs.xyz.to_value(u.au), dtype=float)
-    result: np.ndarray = earth + site_offset
-    return result
+    """Barycentric ICRS position of the observer in AU (via its provider)."""
+    provider = resolve_observer_state_provider(observer, ephemeris)
+    return np.asarray(provider.state_at(time).position_au, dtype=float)
 
 
 def _unit_vector(ra_deg: float, dec_deg: float) -> np.ndarray:

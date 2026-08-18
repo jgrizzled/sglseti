@@ -78,3 +78,7 @@ What sglseti v1 does **not** do, and where its numbers stop being trustworthy.
 - Performance is laptop-scale by requirement (see
   [benchmarks.md](benchmarks.md)); there is no parallel or distributed
   execution.
+
+
+Quantified magnitudes for every declared approximation and measured
+floor are published in `accuracy_budget.md`.

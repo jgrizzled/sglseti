@@ -30,10 +30,10 @@ def make_registry_yaml(
     target: dict[str, object] = {
         "display_name": "Test Star",
         "endpoint_kind": "star",
-        "astrometry": astrometry,
+        "state": {"provider": "linear_astrometry_v1", "astrometry": astrometry},
     }
     target.update(target_extra)
-    data = {"schema_version": 1, "targets": {"test-star": target}}
+    data = {"schema_version": 2, "targets": {"test-star": target}}
     path = tmp_path / "targets.yaml"
     path.write_text(yaml.safe_dump(data), encoding="utf-8")
     return path
@@ -57,9 +57,9 @@ def test_registry_mapping_behavior() -> None:
 
 
 def test_schema_version_mismatch(tmp_path: Path) -> None:
-    path = tmp_path / "targets.yaml"
-    path.write_text("schema_version: 2\ntargets: {}\n", encoding="utf-8")
-    with pytest.raises(ConfigError, match="schema_version"):
+    path = tmp_path / "registry.yaml"
+    path.write_text("schema_version: 1\ntargets: {}\n", encoding="utf-8")
+    with pytest.raises(ConfigError, match="schema_version: must be 2"):
         load_target_registry(path)
 
 
@@ -72,7 +72,7 @@ def test_top_level_not_mapping(tmp_path: Path) -> None:
 
 def test_empty_targets(tmp_path: Path) -> None:
     path = tmp_path / "targets.yaml"
-    path.write_text("schema_version: 1\ntargets: {}\n", encoding="utf-8")
+    path.write_text("schema_version: 2\ntargets: {}\n", encoding="utf-8")
     with pytest.raises(ConfigError, match="non-empty mapping"):
         load_target_registry(path)
 
@@ -196,8 +196,15 @@ def test_unknown_astrometry_key_rejected(tmp_path: Path) -> None:
 def test_missing_endpoint_kind(tmp_path: Path) -> None:
     path = tmp_path / "targets.yaml"
     data = {
-        "schema_version": 1,
-        "targets": {"test-star": {"astrometry": dict(VALID_ASTROMETRY)}},
+        "schema_version": 2,
+        "targets": {
+            "test-star": {
+                "state": {
+                    "provider": "linear_astrometry_v1",
+                    "astrometry": dict(VALID_ASTROMETRY),
+                }
+            }
+        },
     }
     path.write_text(yaml.safe_dump(data), encoding="utf-8")
     with pytest.raises(ConfigError, match="endpoint_kind.*required"):
@@ -206,7 +213,7 @@ def test_missing_endpoint_kind(tmp_path: Path) -> None:
 
 def test_endpoint_kind_other_rejected(tmp_path: Path) -> None:
     path = make_registry_yaml(tmp_path, dict(VALID_ASTROMETRY), endpoint_kind="other")
-    with pytest.raises(ConfigError, match="linear-motion baseline"):
+    with pytest.raises(ConfigError, match="not modeled by provider"):
         load_target_registry(path)
 
 
@@ -219,10 +226,18 @@ def test_unsupported_motion_flags_rejected(tmp_path: Path, flag: str) -> None:
 
 def test_duplicate_target_keys_rejected(tmp_path: Path) -> None:
     path = tmp_path / "targets.yaml"
-    astro = yaml.safe_dump({"astrometry": dict(VALID_ASTROMETRY), "endpoint_kind": "star"})
+    astro = yaml.safe_dump(
+        {
+            "state": {
+                "provider": "linear_astrometry_v1",
+                "astrometry": dict(VALID_ASTROMETRY),
+            },
+            "endpoint_kind": "star",
+        }
+    )
     indented = "\n".join(f"    {line}" for line in astro.splitlines())
     path.write_text(
-        "schema_version: 1\ntargets:\n  dupe:\n" + indented + "\n  dupe:\n" + indented + "\n",
+        "schema_version: 2\ntargets:\n  dupe:\n" + indented + "\n  dupe:\n" + indented + "\n",
         encoding="utf-8",
     )
     with pytest.raises(ConfigError, match="duplicate mapping key"):
