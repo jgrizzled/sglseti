@@ -162,6 +162,15 @@ Decision (ADR-0001): v1 does **not** propagate catalog covariance.
 - The registry schema gains an optional covariance block only when a
   propagating model exists (post-v1); `AstrometricState` stays as is.
 
+**Addendum (v1.1, 2026-08-18):** the model-level cut line above is
+unchanged — `tusay2022_eq5_7_v1` still propagates no covariance, and
+batch product widths remain assumed pads. Covariance now lives OUTSIDE
+the model: the registry schema carries per-value uncertainties and full
+covariance matrices (`docs/registry.md`), and the separate
+`sglseti.uncertainty` module propagates them by seeded Monte Carlo into
+explicitly labeled products (`UncertaintyMethod.PROPAGATED`), per the
+conditions listed here. Quantified floors: `docs/accuracy_budget.md`.
+
 ## 8. Validation matrix (Phase 4 must implement)
 
 1. Published-equation test → `alpha_cen_2021-11-06.yaml` (vs

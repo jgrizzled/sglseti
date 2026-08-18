@@ -644,6 +644,9 @@ dependencies = [
 jpl = [
     { name = "jplephem" },
 ]
+spice = [
+    { name = "spiceypy" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -671,8 +674,9 @@ requires-dist = [
     { name = "jplephem", marker = "extra == 'jpl'", specifier = ">=2.21" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "pyyaml", specifier = ">=6.0" },
+    { name = "spiceypy", marker = "extra == 'spice'", specifier = ">=6" },
 ]
-provides-extras = ["jpl"]
+provides-extras = ["jpl", "spice"]
 
 [package.metadata.requires-dev]
 dev = [

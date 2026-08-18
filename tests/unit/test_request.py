@@ -334,3 +334,14 @@ def test_error_messages_include_file_and_path(tmp_path: Path) -> None:
     message = str(excinfo.value)
     assert str(path) in message
     assert "relay_range.min_au" in message
+
+
+def test_archival_survey_example_loads() -> None:
+    from sglseti.models import OutputFormat, TimeIntervals
+
+    request = load_request(EXAMPLES / "archival-survey.yaml")
+    assert request.target_ids == ("alpha-cen-a",)
+    assert isinstance(request.time, TimeIntervals)
+    assert request.time.intervals[0].interval_id == "exposure-0001"
+    assert request.time.intervals[1].subintegration_cadence_s == 43200.0
+    assert OutputFormat.VOTABLE in request.output_formats

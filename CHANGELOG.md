@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.0]
 
 ### Changed
 
@@ -39,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests/regression/test_accuracy_budget.py`: the builtin-vs-kernel
   relay-pointing floor is <= 0.02 mas (the geometry depends on the
   Earth-Sun relative vector, cancelling ~119 km of absolute analytic
-  ephemeris error), the tx-epoch amplification law mu*2d/c is verified to
+  ephemeris error), the tx-epoch amplification law mu\*2d/c is verified to
   1 percent (~74 arcsec for Wolf 359), spacecraft displacement maps to
   delta/rho exactly (0.01 AU at 550 AU = 3.76 arcsec), and the neglected
   solar-motion class is bounded by v_sun/c ~ 11 mas, consistent with the
@@ -210,8 +210,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   orbit/endpoint coherence is enforced. (The v1 schema and its
   migration path were later removed by the greenfield decision above;
   the registry has a single schema.) The `two_body_orbit_v1` family is
-  verified against the published Alpha Centauri AB (Pourbaix & Boffin
-  2016) and Sirius AB (Bond et al. 2017) solutions via an independent
+  verified against the published Alpha Centauri AB (Pourbaix & Boffin 2016) and Sirius AB (Bond et al. 2017) solutions via an independent
   Thiele-Innes/bisection reference implementation
   (`tests/data/reference/two_body_orbit_reference.py`), including the
   observed ~4 arcsec Alpha Cen separation in 2016 and ~11 arcsec Sirius

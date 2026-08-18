@@ -1,0 +1,54 @@
+# Example archival-survey calculation request for sglseti (request schema v1).
+#
+# Demonstrates the survey-facing request features added in v1.1:
+#
+# - first-class OBSERVATION INTERVALS instead of instantaneous epochs:
+#   each interval materializes into labeled samples
+#   (`<id>@start|mid|stop`, or a declared subintegration grid), and every
+#   output row carries interval_id / interval_phase / interval_duration_s;
+# - a rich-registry target (pair with examples/targets_advanced.yaml:
+#   alpha-cen-a uses the two_body_orbit_v1 provider family, and every row
+#   records the provider identity and content hash);
+# - VOTable output alongside the canonical ECSV.
+#
+# Run:
+#   sglseti generate --targets examples/targets_advanced.yaml \
+#     --request examples/archival-survey.yaml --output-dir build/survey-demo
+#
+# A spacecraft-borne archive (e.g. WISE) would replace the observer block
+# with a checksummed tabular ephemeris (see docs/registry.md):
+#   observer:
+#     kind: spacecraft_table
+#     name: wise
+#     path: resources/wise_positions.ecsv
+#     checksum_sha256: sha256:...
+schema_version: 1
+
+targets: [alpha-cen-a]
+roles: [rx, tx]
+
+time:
+  intervals:
+    - id: exposure-0001
+      start_utc: 2010-06-05T03:14:00Z
+      stop_utc: 2010-06-05T03:14:08Z
+    - id: coadd-epoch-1
+      start_utc: 2010-07-01T00:00:00Z
+      stop_utc: 2010-07-03T00:00:00Z
+      subintegration_cadence_s: 43200.0
+
+observer:
+  kind: earth_center
+
+relay_range:
+  min_au: 550.0
+  max_au: 2500.0
+  sampling:
+    kind: count
+    count: 15
+
+model:
+  id: tusay2022_eq5_7_v1
+
+products:
+  formats: [ecsv, json, votable]

@@ -39,8 +39,9 @@ terrestrial-site observers are never mixed silently.
 | range | `z_au` (representative reciprocal-midpoint distance), `q_per_au` = 1/z; represented interval `z_near_au`, `z_far_au`, `q_lo_per_au`, `q_hi_per_au` |
 | geometry | `icrs_ra_deg`, `icrs_dec_deg`, `observer_id`; interval-boundary coordinates `near_icrs_*`, `far_icrs_*` — the coverage extremes a pointing footprint must contain |
 | model | `model_id`, `model_version`; approximation flags `rho_equals_z_assumed`, `constant_target_distance_assumed`, `linear_stellar_motion_assumed`, `solar_motion_neglected`; `catalog_epoch_semantics` |
-| provenance | `target_source_hash`, `ephemeris_id` (content checksum for file-backed kernels) |
+| provenance | `target_source_hash`, `ephemeris_id` (content checksum for file-backed kernels); the adopted solutions by content: `target_provider_id`/`_version`/`_hash`, `observer_provider_id`/`_version`/`_hash` |
 | quality | `validity` (valid/degraded/invalid), `uncertainty_method` (assumed/not_propagated), `warnings` (`;`-joined machine-readable codes) |
+| observation interval | `interval_id`, `interval_phase` (`start`/`mid`/`stop` or `sub-NNNN`), `interval_duration_s` — populated only for the `intervals` time mode; empty for point epochs |
 | optional | `cirs_*`, `altaz_*`, `rate_ra_cosdec_arcsec_per_hr`, `rate_dec_arcsec_per_hr` (central finite difference, 60 s step), `near_rate_*` (rates at the near boundary — the interval's fastest point, used for motion padding) |
 
 Invalid rows carry NaN (ECSV/CSV) or `null` (JSON) coordinates plus a
@@ -88,8 +89,8 @@ intervals (request order) × minima (ascending time).
 | time | `t_ca_utc`, `t_ca_tdb_jd` (closest approach), `catalog_direction_epoch_tdb_jd` (axis epoch: inbound `u = t_o`, outbound `u = t_o + 2d/c`) |
 | geometry | `b_min_au`/`b_min_km`/`b_min_solar_radii` (impact parameter — the product itself, never a binary verdict), `axis_distance_au` (signed along-axis distance), `side` (target/anti_target; empty on invalid rows), `v_perp_km_s` (transverse speed relative to the axis), `axis_icrs_*` (barycentric axis direction), `star_icrs_*` / `relay_icrs_*` (observer-relative geometric pointings to the propagated star and to the relay at `z_au`), `z_au`, `target_light_time_days` |
 | model | `role` (the frozen direction epoch consumed: antipode/tx), `axis_model_id`/`axis_model_version`, `model_id`/`model_version` |
-| provenance | `target_source_hash`, `ephemeris_id` |
-| quality | `validity`, `uncertainty_method` (always `not_propagated` in v1), `warnings`, `window_count` |
+| provenance | `target_source_hash`, `ephemeris_id`, `target_provider_id`/`_version`/`_hash`, `observer_provider_id`/`_version`/`_hash` |
+| quality | `validity`, `uncertainty_method` (always `not_propagated` on scan events; distributions come from the separate `crossing_uncertainty()` product), `warnings`, `window_count` |
 | windows table | `window_id`, `event_id`, `beam_radius_au` (**assumed** hypothesis radius), `ingress_utc`/`egress_utc` (+ `_tdb_jd`), `duration_days`, `truncated_ingress`/`truncated_egress` (impact parameter still inside the radius at the interval edge) |
 
 Boundary minima (impact parameter still decreasing toward, or minimal at,
@@ -110,7 +111,14 @@ the pinned Earth-orientation table), `uncertainty_not_propagated`,
 `no_visible_window:target/role`, `no_operational_samples:target/role`,
 `group_exceeds_usable_fov`, `minimum_at_interval_start` /
 `minimum_at_interval_stop` (degraded crossing boundary minima),
-`invalid_event_count:N`, `degraded_event_count:N`, plus `astropy:*`
+`invalid_event_count:N`, `degraded_event_count:N`,
+`adaptive_budget_exhausted` / `time_sampling_budget_exhausted` (an
+adaptive locus/sweep hit its evaluation budget before meeting its
+tolerance — the bound is weakened loudly, never silently),
+`degraded_uncertainty_samples:N` / `invalid_uncertainty_samples:N`
+(Monte Carlo sample quality), `minimum_at_window_edge:N` (a
+crossing-uncertainty sample's minimum hit the search window edge — widen
+the window), plus `astropy:*`
 propagation and
 coordinate-transform messages (any captured transform warning degrades an
 otherwise valid sample). `invalid` is reserved for uninterpretable
@@ -125,3 +133,24 @@ labeled `uncertainty_method = not_propagated` and warned; narrow-field
 scientific use then requires an independently justified envelope. DS9
 regions (which draw a width) refuse to generate without an explicit assumed
 half-width.
+
+Propagated uncertainty is a separate, opt-in product family
+(`propagate_locus_uncertainty()`, `crossing_uncertainty()`): seeded Monte
+Carlo over the registry's declared per-value uncertainties and
+covariance, carrying `UncertaintyMethod.PROPAGATED`, the seed, sample
+count, declared confidence level, empirical (non-Gaussian-safe)
+percentiles, and explicit contribution labels (`target_state:propagated`;
+observer state, ephemeris, and model floors `not_propagated`). Assumed
+and propagated widths are never merged.
+
+## Formats and manifest
+
+`samples.ecsv` is canonical; `csv` is a convenience view, `json` the
+lossless document, `votable` an interoperability serialization
+(`samples.vot` / `events.vot`, units preserved), and `ds9` region output
+requires an assumed half-width. `manifest.json` separates the hashed
+science identity — request, model, target/observer provider identities
+and content hashes, resource checksums, uncertainty declaration, time
+semantics — from run metadata (timestamp, output file hashes, library
+versions, optional caller-supplied `source_revision`), which never
+influences the science hash.

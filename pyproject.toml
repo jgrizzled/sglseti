@@ -37,6 +37,7 @@ dependencies = [
 
 [project.optional-dependencies]
 jpl = ["jplephem>=2.21"]
+spice = ["spiceypy>=6"]
 
 [project.scripts]
 sglseti = "sglseti.cli:main"

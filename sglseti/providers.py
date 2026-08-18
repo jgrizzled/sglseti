@@ -1,6 +1,7 @@
 """Target-state and observer-state provider protocols and baselines.
 
-Roadmap item 6.1 (notes/improvements.md §2.1, §2.4): versioned provider
+Roadmap item 6.1 (improvements-note §2.1, §2.4; see that note's
+historical section map): versioned provider
 interfaces behind which richer endpoint and observer models can be added
 without touching the geometry core. This module defines the protocols and
 the two baseline families that preserve v1 behavior exactly:
