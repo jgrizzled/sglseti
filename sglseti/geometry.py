@@ -294,7 +294,8 @@ def observer_barycentric_au(
 ) -> np.ndarray:
     """Barycentric ICRS position of the observer in AU (via its provider)."""
     provider = resolve_observer_state_provider(observer, ephemeris)
-    return np.asarray(provider.state_at(time).position_au, dtype=float)
+    position: np.ndarray = np.asarray(provider.state_at(time).position_au, dtype=float)
+    return position
 
 
 def _unit_vector(ra_deg: float, dec_deg: float) -> np.ndarray:
