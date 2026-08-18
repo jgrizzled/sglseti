@@ -73,6 +73,30 @@ reason code — never a fabricated position.
   (`window_start_utc`/`window_stop_utc`) are grid-sampled;
   `representative_time_utc` is the window's middle grid point.
 
+## Crossing event and window tables (`events.ecsv` / `windows.ecsv`)
+
+Products of `sglseti crossings` (`find_crossings()`), under the
+`sun_star_axis_v1` axis contract (ADR-0003): one event per local minimum
+of the observer's perpendicular distance to the Sun-anchored beam axis,
+one window row per assumed beam radius containing that minimum
+(`event_id` is the join key). Event order is targets × link directions ×
+intervals (request order) × minima (ascending time).
+
+| Group | Columns |
+|---|---|
+| identity | `crossings_id`, `event_id`, `target_id`, `link_direction` (inbound = star→relay uplink, outbound = relay→star downlink), `interval_id`, `minimum_index`, `observer_id` |
+| time | `t_ca_utc`, `t_ca_tdb_jd` (closest approach), `catalog_direction_epoch_tdb_jd` (axis epoch: inbound `u = t_o`, outbound `u = t_o + 2d/c`) |
+| geometry | `b_min_au`/`b_min_km`/`b_min_solar_radii` (impact parameter — the product itself, never a binary verdict), `axis_distance_au` (signed along-axis distance), `side` (target/anti_target; empty on invalid rows), `v_perp_km_s` (transverse speed relative to the axis), `axis_icrs_*` (barycentric axis direction), `star_icrs_*` / `relay_icrs_*` (observer-relative geometric pointings to the propagated star and to the relay at `z_au`), `z_au`, `target_light_time_days` |
+| model | `role` (the frozen direction epoch consumed: antipode/tx), `axis_model_id`/`axis_model_version`, `model_id`/`model_version` |
+| provenance | `target_source_hash`, `ephemeris_id` |
+| quality | `validity`, `uncertainty_method` (always `not_propagated` in v1), `warnings`, `window_count` |
+| windows table | `window_id`, `event_id`, `beam_radius_au` (**assumed** hypothesis radius), `ingress_utc`/`egress_utc` (+ `_tdb_jd`), `duration_days`, `truncated_ingress`/`truncated_egress` (impact parameter still inside the radius at the interval edge) |
+
+Boundary minima (impact parameter still decreasing toward, or minimal at,
+an interval edge) are `degraded` with `minimum_at_interval_start/stop`:
+the true closest approach may lie outside the searched span, but in-beam
+time at the edge is real and never hidden.
+
 ## Warning codes
 
 `below_solar_focal_minimum` (degraded; below the finite-source photospheric
@@ -84,7 +108,10 @@ physical bound), `ephemeris_out_of_coverage:*` (invalid),
 the pinned Earth-orientation table), `uncertainty_not_propagated`,
 `invalid_sample_count:N`, `degraded_sample_count:N`,
 `no_visible_window:target/role`, `no_operational_samples:target/role`,
-`group_exceeds_usable_fov`, plus `astropy:*` propagation and
+`group_exceeds_usable_fov`, `minimum_at_interval_start` /
+`minimum_at_interval_stop` (degraded crossing boundary minima),
+`invalid_event_count:N`, `degraded_event_count:N`, plus `astropy:*`
+propagation and
 coordinate-transform messages (any captured transform warning degrades an
 otherwise valid sample). `invalid` is reserved for uninterpretable
 results; `below_solar_focal_minimum` and `outside_search_prior` are also

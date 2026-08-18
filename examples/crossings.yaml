@@ -1,0 +1,45 @@
+# Example beam-crossing search request for sglseti (crossings schema v1).
+#
+# Finds when the Earth passes near the hypothesized Barnard's Star relay
+# beam axis (inbound star->relay uplink and outbound relay->star downlink)
+# across an archival span and a current-era span. Events report the
+# impact parameter itself; the beam radii below are ASSUMED hypothesis
+# parameters producing ingress/egress windows, never physical claims.
+# Archive lookup and telescope-schedule intersection happen in external
+# systems that consume these products.
+schema_version: 1
+
+targets: [barnard]
+link_directions: [inbound, outbound]
+
+intervals:
+  - interval_id: archive-era
+    start_utc: 1998-01-01T00:00:00Z
+    stop_utc: 2003-01-01T00:00:00Z
+  - interval_id: commensal-era
+    start_utc: 2026-01-01T00:00:00Z
+    stop_utc: 2028-01-01T00:00:00Z
+
+observer:
+  kind: earth_center
+
+# Representative relay distance of the hypothesis: the crossing axis does
+# not depend on it, but validity checks and the relay pointing product do.
+relay_distance_au: 800.0
+
+beam:
+  # Assumed effective beam radii at the observer, in AU.
+  radii_au: [0.05, 0.5]
+
+scan:
+  coarse_step_days: 10.0
+  refine_tolerance_s: 60.0
+
+model:
+  id: tusay2022_eq5_7_v1
+
+ephemeris:
+  adapter: astropy_builtin
+
+products:
+  formats: [ecsv, json, csv]

@@ -43,13 +43,22 @@ _EXPORTS = {
     "GenerationError": "sglseti.errors",
     "PlanningError": "sglseti.errors",
     "plan_commensal": "sglseti.planning",
+    "AXIS_MODEL_ID": "sglseti.crossings",
+    "AXIS_MODEL_VERSION": "sglseti.crossings",
+    "find_crossings": "sglseti.crossings",
+    "impact_parameter": "sglseti.crossings",
     "write_products": "sglseti.export",
     "result_manifest": "sglseti.export",
     "RESULT_SCHEMA_VERSION": "sglseti.export",
+    "write_crossings_products": "sglseti.export",
+    "crossings_manifest": "sglseti.export",
+    "CROSSINGS_RESULT_SCHEMA_VERSION": "sglseti.export",
     "VisibilityWindow": "sglseti.observability",
     "find_windows": "sglseti.observability",
     "visibility_sample": "sglseti.observability",
     "Role": "sglseti.models",
+    "LinkDirection": "sglseti.models",
+    "BeamSide": "sglseti.models",
     "EndpointKind": "sglseti.models",
     "Validity": "sglseti.models",
     "UncertaintyMethod": "sglseti.models",
@@ -73,18 +82,25 @@ _EXPORTS = {
     "TimeSingle": "sglseti.models",
     "TimeList": "sglseti.models",
     "TimeGrid": "sglseti.models",
+    "TimeInterval": "sglseti.models",
     "ObservabilityConstraints": "sglseti.models",
     "FieldOfView": "sglseti.models",
     "GeometryRequest": "sglseti.models",
+    "CrossingsRequest": "sglseti.models",
     "LocusSample": "sglseti.models",
     "Corridor": "sglseti.models",
     "VisibilitySample": "sglseti.models",
     "Pointing": "sglseti.models",
     "CalculationResult": "sglseti.models",
     "RangeSegment": "sglseti.models",
+    "ImpactSample": "sglseti.models",
+    "BeamWindow": "sglseti.models",
+    "CrossingEvent": "sglseti.models",
+    "CrossingsResult": "sglseti.models",
     "TargetRegistry": "sglseti.targets",
     "load_target_registry": "sglseti.targets",
     "load_request": "sglseti.config",
+    "load_crossings_request": "sglseti.config",
     "load_epoch_table": "sglseti.config",
     "generate_segments": "sglseti.sampling",
     "segments_for_request": "sglseti.sampling",
@@ -99,7 +115,13 @@ _EXPORTS = {
 __all__ = ["__version__", *sorted(_EXPORTS)]
 
 if TYPE_CHECKING:
-    from .config import load_epoch_table, load_request
+    from .config import load_crossings_request, load_epoch_table, load_request
+    from .crossings import (
+        AXIS_MODEL_ID,
+        AXIS_MODEL_VERSION,
+        find_crossings,
+        impact_parameter,
+    )
     from .ephemeris import AstropyEphemeris, IersResource
     from .errors import (
         ConfigError,
@@ -109,7 +131,14 @@ if TYPE_CHECKING:
         PlanningError,
         SglsetiError,
     )
-    from .export import RESULT_SCHEMA_VERSION, result_manifest, write_products
+    from .export import (
+        CROSSINGS_RESULT_SCHEMA_VERSION,
+        RESULT_SCHEMA_VERSION,
+        crossings_manifest,
+        result_manifest,
+        write_crossings_products,
+        write_products,
+    )
     from .generate import generate_loci, materialize_epochs
     from .geometry import (
         Tusay2022Eq57V1,
@@ -120,10 +149,15 @@ if TYPE_CHECKING:
     from .models import (
         SUPPORTED_MODEL_IDS,
         AstrometricState,
+        BeamSide,
+        BeamWindow,
         CalculationResult,
         CoordinateProduct,
         CorrectionType,
         Corridor,
+        CrossingEvent,
+        CrossingsRequest,
+        CrossingsResult,
         DirectionSolution,
         EndpointKind,
         EphemerisAdapter,
@@ -132,6 +166,8 @@ if TYPE_CHECKING:
         FieldOfView,
         GeometryRequest,
         IersSpec,
+        ImpactSample,
+        LinkDirection,
         LocusSample,
         ObservabilityConstraints,
         Observer,
@@ -146,6 +182,7 @@ if TYPE_CHECKING:
         Target,
         TargetEventKind,
         TimeGrid,
+        TimeInterval,
         TimeList,
         TimeSingle,
         UncertaintyMethod,

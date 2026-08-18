@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Beam-crossing search (`sglseti crossings`, `find_crossings()`,
+  `impact_parameter()`): finds when an observer passes closest to a
+  target's hypothesized relay beam axis under the new `sun_star_axis_v1`
+  contract (ADR-0003) — inbound (star→relay uplink) at the apparent-state
+  epoch, outbound (relay→star downlink) at the tx aim epoch, both reusing
+  the reviewed `tusay2022_eq5_7_v1` catalog propagation. A crossings
+  request (crossings schema v1: targets, link directions, continuous time
+  intervals with stable `interval_id` join keys, observer, representative
+  relay distance, assumed beam radii, scan controls) is searched
+  deterministically offline: coarse scan, golden-section closest-approach
+  refinement, bisected ingress/egress per assumed radius. Products
+  (`events.ecsv`/`.csv`, `windows.ecsv`/`.csv`, `result.json`,
+  `manifest.json`; crossings result schema v1) report the impact parameter
+  itself (AU/km/solar radii) with signed axis distance and side,
+  transverse speed, the axis direction, and the star/relay pointings an
+  observation would use — never a detectability verdict. Boundary minima
+  are degraded and flagged (`minimum_at_interval_start/stop`), assumed
+  radii are labeled hypotheses, uncertainty stays `not_propagated` with a
+  warning, ephemeris-coverage failures yield invalid status rows (or fail
+  the batch with `--strict`), and the crossings/event/window IDs are
+  stable science-input identities. `sglseti validate crossings` and
+  `examples/crossings.yaml` included.
+
 ## [1.0.0rc2] - 2026-08-17
 
 Fixes for the scientific accuracy review.

@@ -65,6 +65,30 @@ def _cmd_validate_request(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_validate_crossings(args: argparse.Namespace) -> int:
+    from .config import load_crossings_request
+
+    request = load_crossings_request(args.path)
+    print(f"OK: crossings request {args.path} is valid")
+    print(f"  targets: {', '.join(request.target_ids)}")
+    print(
+        "  link directions: "
+        f"{', '.join(direction.value for direction in request.link_directions)}"
+    )
+    for interval in request.intervals:
+        print(
+            f"  interval {interval.interval_id}: "
+            f"{interval.start.utc.isot} to {interval.stop.utc.isot}"
+        )
+    print(f"  observer: {request.observer.observer_id} ({request.observer.kind})")
+    print(f"  relay distance: {request.relay_distance_au:g} AU")
+    if request.beam_radii_au:
+        radii = ", ".join(f"{radius:g}" for radius in request.beam_radii_au)
+        print(f"  assumed beam radii: {radii} AU")
+    print(f"  model: {request.model_id}")
+    return 0
+
+
 def _cmd_samples(args: argparse.Namespace) -> int:
     from .config import load_request
     from .sampling import segments_for_request
@@ -156,6 +180,41 @@ def _cmd_plan(args: argparse.Namespace) -> int:
     return _write_and_report(result, args, input_hashes)
 
 
+def _cmd_crossings(args: argparse.Namespace) -> int:
+    from datetime import UTC, datetime
+
+    from .config import load_crossings_request
+    from .crossings import find_crossings
+    from .export import write_crossings_products
+    from .models import Validity
+    from .provenance import file_sha256
+    from .targets import load_target_registry
+
+    registry = load_target_registry(args.targets)
+    request = load_crossings_request(args.request)
+    input_hashes = {
+        "targets_yaml": file_sha256(args.targets),
+        "request_yaml": file_sha256(args.request),
+    }
+    result = find_crossings(request, registry, strict=args.strict)
+    written = write_crossings_products(
+        result,
+        args.output_dir,
+        generated_utc=datetime.now(UTC).isoformat(),
+        input_file_hashes=input_hashes,
+    )
+    invalid = sum(1 for e in result.events if e.validity is Validity.INVALID)
+    window_count = sum(len(e.windows) for e in result.events)
+    print(f"crossings: {result.crossings_id}")
+    print(f"events: {len(result.events)} ({invalid} invalid), windows: {window_count}")
+    for warning in result.warnings:
+        print(f"warning: {warning}", file=sys.stderr)
+    for label, path in sorted(written.items()):
+        print(f"{label}: {path}")
+    # Exit policy: 0 clean, 1 completed with invalid status rows, 2 usage.
+    return 1 if invalid else 0
+
+
 def _cmd_fetch_ephemeris(args: argparse.Namespace) -> int:
     from .resources import fetch_kernel
 
@@ -231,6 +290,12 @@ def build_parser() -> argparse.ArgumentParser:
     validate_request.add_argument("path", help="Path to the request YAML.")
     validate_request.set_defaults(func=_cmd_validate_request)
 
+    validate_crossings = validate_kind.add_parser(
+        "crossings", help="Validate a beam-crossing search request YAML file."
+    )
+    validate_crossings.add_argument("path", help="Path to the crossings request YAML.")
+    validate_crossings.set_defaults(func=_cmd_validate_crossings)
+
     samples = subcommands.add_parser(
         "samples",
         help=(
@@ -283,6 +348,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail the whole batch on the first invalid sample.",
     )
     plan.set_defaults(func=_cmd_plan)
+
+    crossings = subcommands.add_parser(
+        "crossings",
+        help=(
+            "Find beam-crossing events (impact-parameter minima) over the "
+            "request's time intervals. Archive lookup and schedule "
+            "intersection happen in external systems."
+        ),
+    )
+    crossings.add_argument("--targets", required=True, help="Target registry YAML.")
+    crossings.add_argument(
+        "--request", required=True, help="Crossings request YAML."
+    )
+    crossings.add_argument(
+        "--output-dir", required=True, help="Directory for product files."
+    )
+    crossings.add_argument(
+        "--strict",
+        action="store_true",
+        help="Fail the whole search on the first invalid combination.",
+    )
+    crossings.set_defaults(func=_cmd_crossings)
 
     fetch = subcommands.add_parser(
         "fetch",

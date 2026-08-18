@@ -37,6 +37,18 @@ What sglseti v1 does **not** do, and where its numbers stop being trustworthy.
   approximation error; beyond it results are `degraded`
   (`outside_search_prior`), and no independent error model replaces the
   prior.
+- **Crossings report geometry, not detectability.** The
+  `sun_star_axis_v1` impact parameter ([ADR-0003](adr/0003-crossing-axis-model.md))
+  says how far the observer sits from the Sun-anchored beam axis; whether
+  a signal would be seen depends on beam width, annular illumination, the
+  SGL point-spread function, wavelength, transmitter aim and scan
+  pattern, and receiver aperture — all outside the model. Beam radii in
+  requests are assumed hypotheses; window durations are exact only for
+  those assumptions. The outbound axis additionally neglects the
+  relay-emission epoch retardation (~z/c, ≲0.1″-class), and
+  impact-parameter uncertainty is not propagated — astrometric error
+  displaces the axis by ~7×10⁻⁶ AU per arcsecond at 1 AU, which matters
+  for sub-10⁻⁴ AU beam hypotheses.
 
 ## Product boundary
 

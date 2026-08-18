@@ -1,8 +1,9 @@
 # Quick start
 
-Two workflows share one epoch-neutral engine: historical target generation
-for archive cross-referencing, and commensal planning for current/future
-observing. Both run fully offline once inputs are local.
+Three workflows share one epoch-neutral engine: historical target
+generation for archive cross-referencing, commensal planning for
+current/future observing, and beam-crossing searches over past or future
+time intervals. All run fully offline once inputs are local.
 
 Setup:
 
@@ -52,6 +53,47 @@ Adds `visibility.ecsv` (altitude, Sun altitude, Moon separation, pass/fail
 per grid epoch), `pointings.ecsv`/`.csv` (conservative circular candidate
 zones with their radius components), and `regions.ds9`. Pointings are
 candidate zones with valid windows — never a schedule.
+
+## Crossings: when Earth passes through a hypothesized beam
+
+A crossings request scans continuous time intervals — historical for
+archival cross-referencing, current/future for commensal awareness — for
+local minima of Earth's distance to each target's Sun-anchored beam axis
+(inbound star→relay uplink at the apparent-state epoch, outbound
+relay→star downlink at the tx aim epoch; ADR-0003):
+
+```bash
+sglseti validate crossings examples/crossings.yaml
+sglseti crossings \
+  --targets examples/targets.yaml \
+  --request examples/crossings.yaml \
+  --output-dir build/crossings
+```
+
+Outputs: `events.ecsv` (one row per closest approach: `t_ca_utc`, the
+impact parameter `b_min_au`, side, transverse speed, and the two pointings
+an observation would use — the star and the relay locus) and
+`windows.ecsv` (ingress/egress per **assumed** beam radius, joined by
+`event_id`), plus `result.json` and `manifest.json`. Feed the windows and
+pointings to your archive query or schedule-intersection tool; sglseti
+reports the impact parameter itself, never a detectability verdict.
+
+For a schedule-holding consumer, the point query is cheaper than a scan:
+
+```python
+from astropy.time import Time
+from sglseti import AstropyEphemeris, LinkDirection, Observer, impact_parameter
+
+sample = impact_parameter(
+    target=registry["barnard"],
+    time=Time("2026-12-21T12:00:00", scale="utc"),
+    link_direction=LinkDirection.INBOUND,
+    observer=Observer.earth_center(),
+    z_au=800.0,
+    ephemeris=AstropyEphemeris(),
+)
+print(sample.b_au, sample.side)
+```
 
 ## The same thing from Python
 

@@ -5,7 +5,7 @@ targets for searches for solar gravitational lens (SGL) technosignatures. It
 turns a curated stellar-system hypothesis, an observer, and past or future
 epochs into telescope-usable SGL target regions.
 
-One stateless, epoch-neutral engine supports two workflows:
+One stateless, epoch-neutral engine supports three workflows:
 
 - **Archival target generation** — calculate where an SGL relay hypothesis
   would have appeared at historical epochs so the positions can be
@@ -13,6 +13,11 @@ One stateless, epoch-neutral engine supports two workflows:
 - **Commensal target generation** — calculate current or future positions,
   visibility, and simple circular-field pointings for use alongside another
   observing program.
+- **Beam-crossing search** — scan past or future time intervals for the
+  moments Earth passes closest to a target's hypothesized relay beam axis
+  (inbound uplink or outbound downlink), reporting impact-parameter events
+  and assumed-beam-radius windows for archive cross-referencing and
+  commensal awareness (`sglseti crossings`, ADR-0003).
 
 ## Product boundary
 

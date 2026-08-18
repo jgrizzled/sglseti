@@ -30,10 +30,15 @@ if TYPE_CHECKING:
 __all__ = [
     "SUPPORTED_MODEL_IDS",
     "AstrometricState",
+    "BeamSide",
+    "BeamWindow",
     "CalculationResult",
     "CoordinateProduct",
     "CorrectionType",
     "Corridor",
+    "CrossingEvent",
+    "CrossingsRequest",
+    "CrossingsResult",
     "DirectionSolution",
     "EndpointKind",
     "Epoch",
@@ -41,6 +46,8 @@ __all__ = [
     "EphemerisSpec",
     "FieldOfView",
     "GeometryRequest",
+    "ImpactSample",
+    "LinkDirection",
     "LocusSample",
     "ObservabilityConstraints",
     "Observer",
@@ -55,6 +62,7 @@ __all__ = [
     "Target",
     "TargetEventKind",
     "TimeGrid",
+    "TimeInterval",
     "TimeList",
     "TimeSingle",
     "UncertaintyMethod",
@@ -80,6 +88,25 @@ class Role(StrEnum):
     ANTIPODE = "antipode"
     RX = "rx"
     TX = "tx"
+
+
+class LinkDirection(StrEnum):
+    """Which leg of the hypothesized relay link a beam crossing samples.
+
+    ``inbound`` is the home-star-to-relay uplink; ``outbound`` is the
+    relay-to-home-star downlink. Each maps to a fixed catalog direction
+    epoch in the crossing axis model (ADR-0003), not a free parameter.
+    """
+
+    INBOUND = "inbound"
+    OUTBOUND = "outbound"
+
+
+class BeamSide(StrEnum):
+    """Which side of the Sun the observer is on along the beam axis."""
+
+    TARGET = "target"
+    ANTI_TARGET = "anti_target"
 
 
 class EndpointKind(StrEnum):
@@ -550,6 +577,29 @@ TimeSpec = TimeSingle | TimeList | TimeGrid
 
 
 @dataclass(frozen=True)
+class TimeInterval:
+    """A caller-identified continuous time span to scan for beam crossings.
+
+    Unlike the point-epoch time modes, an interval is searched continuously:
+    the scanner chooses its own evaluation times inside it. ``interval_id``
+    is the join key carried onto every crossing event found within the span.
+    """
+
+    interval_id: str
+    start: Time
+    stop: Time
+
+    def __post_init__(self) -> None:
+        if not _EPOCH_ID_PATTERN.match(self.interval_id):
+            raise ValueError(
+                "interval_id must be non-empty without whitespace, "
+                f"got {self.interval_id!r}"
+            )
+        if not self.start < self.stop:
+            raise ValueError("interval start must precede stop")
+
+
+@dataclass(frozen=True)
 class ObservabilityConstraints:
     """Simple pass/fail thresholds for terrestrial-site planning."""
 
@@ -682,6 +732,110 @@ class GeometryRequest:
                         f"explicit distance {value} AU is outside the relay range "
                         f"[{low}, {high}] AU"
                     )
+
+
+#: Coarse scan cadence bounds in days. The impact-parameter history of a
+#: one-AU observer has at most semiannual structure, so minima are bracketed
+#: reliably for any step comfortably below ~90 days; 30 days is a
+#: conservative ceiling and the floor only guards against runaway scans.
+CROSSING_SCAN_STEP_MIN_DAYS = 0.01
+CROSSING_SCAN_STEP_MAX_DAYS = 30.0
+
+
+@dataclass(frozen=True)
+class CrossingsRequest:
+    """A validated beam-crossing search request (crossings schema v1).
+
+    Targets are referenced by ID and resolved against a
+    :class:`~sglseti.targets.TargetRegistry` at search time, mirroring
+    :class:`GeometryRequest`. ``relay_distance_au`` is the single
+    representative relay distance of the hypothesis: the crossing axis does
+    not depend on it, but validity checks and the relay pointing product do.
+
+    ``beam_radii_au`` are caller-assumed effective beam radii at the
+    observer — hypothesis parameters, never physical claims; each produces
+    ingress/egress windows on events whose minimum impact parameter is
+    inside it. ``report_max_b_au`` optionally suppresses events whose
+    minimum impact parameter exceeds it; by default every local minimum is
+    reported (the impact parameter itself is the product; detectability is
+    the consumer's judgment).
+    """
+
+    target_ids: tuple[str, ...]
+    link_directions: tuple[LinkDirection, ...]
+    intervals: tuple[TimeInterval, ...]
+    observer: Observer
+    relay_distance_au: float
+    model_id: str
+    beam_radii_au: tuple[float, ...] = ()
+    report_max_b_au: float | None = None
+    coarse_step_days: float = 10.0
+    refine_tolerance_s: float = 60.0
+    ephemeris: EphemerisSpec = field(default_factory=EphemerisSpec)
+    output_formats: tuple[OutputFormat, ...] = (OutputFormat.ECSV, OutputFormat.JSON)
+
+    def __post_init__(self) -> None:
+        if not self.target_ids:
+            raise ValueError("at least one target ID is required")
+        if len(set(self.target_ids)) != len(self.target_ids):
+            raise ValueError("target IDs must be unique")
+        for target_id in self.target_ids:
+            if not _ID_PATTERN.match(target_id):
+                raise ValueError(f"invalid target ID {target_id!r}")
+        if not self.link_directions:
+            raise ValueError("at least one link direction is required")
+        if len(set(self.link_directions)) != len(self.link_directions):
+            raise ValueError("link directions must be unique")
+        if not self.intervals:
+            raise ValueError("at least one time interval is required")
+        interval_ids = [interval.interval_id for interval in self.intervals]
+        if len(set(interval_ids)) != len(interval_ids):
+            raise ValueError("interval IDs must be unique")
+        _require_finite("relay_distance_au", self.relay_distance_au)
+        if self.relay_distance_au <= 0.0:
+            raise ValueError(
+                f"relay_distance_au must be positive, got {self.relay_distance_au}"
+            )
+        if self.model_id not in SUPPORTED_MODEL_IDS:
+            raise ValueError(
+                f"unknown model ID {self.model_id!r}; supported: {sorted(SUPPORTED_MODEL_IDS)}"
+            )
+        for value in self.beam_radii_au:
+            _require_finite("beam_radii_au entry", value)
+            if value <= 0.0:
+                raise ValueError(f"beam_radii_au entries must be positive, got {value}")
+        pairs = zip(self.beam_radii_au, self.beam_radii_au[1:], strict=False)
+        if any(b <= a for a, b in pairs):
+            raise ValueError("beam_radii_au must be strictly increasing")
+        if self.report_max_b_au is not None:
+            _require_finite("report_max_b_au", self.report_max_b_au)
+            if self.report_max_b_au <= 0.0:
+                raise ValueError("report_max_b_au must be positive")
+        _require_finite("coarse_step_days", self.coarse_step_days)
+        if not (
+            CROSSING_SCAN_STEP_MIN_DAYS
+            <= self.coarse_step_days
+            <= CROSSING_SCAN_STEP_MAX_DAYS
+        ):
+            raise ValueError(
+                "coarse_step_days must be within "
+                f"[{CROSSING_SCAN_STEP_MIN_DAYS}, {CROSSING_SCAN_STEP_MAX_DAYS}], "
+                f"got {self.coarse_step_days}"
+            )
+        _require_finite("refine_tolerance_s", self.refine_tolerance_s)
+        if not 0.0 < self.refine_tolerance_s <= 3600.0:
+            raise ValueError(
+                f"refine_tolerance_s must be within (0, 3600], got {self.refine_tolerance_s}"
+            )
+        if not self.output_formats:
+            raise ValueError("at least one output format is required")
+        if len(set(self.output_formats)) != len(self.output_formats):
+            raise ValueError("output formats must be unique")
+        if OutputFormat.DS9 in self.output_formats:
+            raise ValueError(
+                "crossing products are tabular event/window records; DS9 "
+                "regions are a locus/pointing product of geometry requests"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -931,3 +1085,130 @@ class CalculationResult:
     pointings: tuple[Pointing, ...] = ()
     warnings: tuple[str, ...] = ()
     iers_id: str | None = None
+
+
+@dataclass(frozen=True)
+class ImpactSample:
+    """The beam-axis impact parameter of an observer at one instant.
+
+    The scalar product of the crossing axis model (ADR-0003): the
+    perpendicular distance ``b`` of the observer from the Sun-anchored beam
+    axis, with the signed along-axis distance and side. The impact parameter
+    is reported as-is — whether it constitutes a "crossing" depends on the
+    consumer's beam hypothesis.
+    """
+
+    target_id: str
+    link_direction: LinkDirection
+    observer_id: str
+    time_utc: str
+    time_tdb_jd: float
+    b_au: float
+    b_km: float
+    b_solar_radii: float
+    axis_distance_au: float
+    side: BeamSide
+    axis_icrs_ra_deg: float
+    axis_icrs_dec_deg: float
+    role: Role
+    z_au: float
+    axis_model_id: str
+    axis_model_version: str
+    model_id: str
+    model_version: str
+    validity: Validity
+    warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class BeamWindow:
+    """One assumed-beam-radius ingress/egress window around a crossing event.
+
+    ``beam_radius_au`` is the caller's assumed effective beam radius at the
+    observer — a hypothesis parameter, never a propagated physical width. A
+    truncated boundary means the impact parameter was still inside the
+    radius at the requested interval's edge, so the true boundary lies
+    outside the searched span.
+    """
+
+    window_id: str
+    event_id: str
+    beam_radius_au: float
+    ingress_utc: str
+    egress_utc: str
+    ingress_tdb_jd: float
+    egress_tdb_jd: float
+    duration_days: float
+    truncated_ingress: bool = False
+    truncated_egress: bool = False
+
+
+@dataclass(frozen=True)
+class CrossingEvent:
+    """One local minimum of the observer's beam-axis impact parameter.
+
+    ``axis_icrs_*`` is the barycentric catalog axis direction at closest
+    approach; ``star_icrs_*`` and ``relay_icrs_*`` are geometric
+    observer-relative lines of sight to the propagated target and to the
+    hypothesized relay at ``z_au`` — the two pointings an observation of
+    the crossing would use (inbound: the star; outbound: the relay locus).
+    """
+
+    # identity
+    crossings_id: str
+    event_id: str
+    target_id: str
+    link_direction: LinkDirection
+    interval_id: str
+    minimum_index: int
+    observer_id: str
+    # time
+    t_ca_utc: str
+    t_ca_tdb_jd: float
+    catalog_direction_epoch_tdb_jd: float
+    # geometry
+    b_min_au: float
+    b_min_km: float
+    b_min_solar_radii: float
+    axis_distance_au: float
+    v_perp_km_s: float
+    axis_icrs_ra_deg: float
+    axis_icrs_dec_deg: float
+    star_icrs_ra_deg: float
+    star_icrs_dec_deg: float
+    relay_icrs_ra_deg: float
+    relay_icrs_dec_deg: float
+    z_au: float
+    target_light_time_days: float
+    # model
+    role: Role
+    axis_model_id: str
+    axis_model_version: str
+    model_id: str
+    model_version: str
+    # provenance
+    target_source_hash: str
+    ephemeris_id: str
+    # quality
+    validity: Validity
+    uncertainty_method: UncertaintyMethod
+    # ``None`` only on invalid status rows, whose geometry is NaN and whose
+    # side is therefore genuinely unknown — never a fabricated label.
+    side: BeamSide | None = None
+    warnings: tuple[str, ...] = ()
+    windows: tuple[BeamWindow, ...] = ()
+
+
+@dataclass(frozen=True)
+class CrossingsResult:
+    """Immutable crossing-search output plus provenance and warnings.
+
+    Event order is the documented product order: targets (request order) x
+    link directions (request order) x intervals (request order) x minima
+    (ascending time).
+    """
+
+    crossings_id: str
+    request: CrossingsRequest
+    events: tuple[CrossingEvent, ...] = ()
+    warnings: tuple[str, ...] = ()

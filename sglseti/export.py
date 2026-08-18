@@ -32,8 +32,11 @@ from pathlib import Path
 from typing import Any
 
 from .models import (
+    BeamWindow,
     CalculationResult,
     Corridor,
+    CrossingEvent,
+    CrossingsResult,
     LocusSample,
     OutputFormat,
     Pointing,
@@ -42,12 +45,18 @@ from .models import (
 from .provenance import build_manifest, canonicalize, file_sha256
 
 __all__ = [
+    "CROSSINGS_RESULT_SCHEMA_VERSION",
     "RESULT_SCHEMA_VERSION",
+    "crossings_manifest",
     "result_manifest",
+    "write_crossings_products",
     "write_products",
 ]
 
 RESULT_SCHEMA_VERSION = 2
+
+#: Crossing event/window products carry their own schema counter.
+CROSSINGS_RESULT_SCHEMA_VERSION = 1
 
 #: Fixed coordinate/time conventions recorded in every manifest (PRD §9.4).
 CONVENTIONS = {
@@ -71,6 +80,9 @@ _UNIT_SUFFIXES = (
     ("_days", "d"),
     ("_au", "AU"),
     ("_per_au", "1 / AU"),
+    ("_km_s", "km / s"),
+    ("_km", "km"),
+    ("_solar_radii", "solRad"),
 )
 
 _SAMPLE_FIELDS = tuple(f.name for f in dataclasses.fields(LocusSample))
@@ -82,6 +94,11 @@ CORRIDOR_COLUMNS = (
 )
 VISIBILITY_COLUMNS = tuple(f.name for f in dataclasses.fields(VisibilitySample))
 POINTING_COLUMNS = tuple(f.name for f in dataclasses.fields(Pointing))
+EVENT_COLUMNS = (
+    *(f.name for f in dataclasses.fields(CrossingEvent) if f.name != "windows"),
+    "window_count",
+)
+WINDOW_COLUMNS = tuple(f.name for f in dataclasses.fields(BeamWindow))
 
 
 def write_products(
@@ -111,20 +128,26 @@ def write_products(
     visibility_rows = [_record_row(v) for v in result.visibility]
     pointing_rows = [_record_row(p) for p in result.pointings]
 
+    meta = {
+        "result_schema_version": RESULT_SCHEMA_VERSION,
+        "calculation_id": result.calculation_id,
+        "model_id": result.request.model_id,
+        "warnings": list(result.warnings),
+    }
     if OutputFormat.ECSV in formats:
         written["samples_ecsv"] = _write_ecsv(
-            output_dir / "samples.ecsv", SAMPLE_COLUMNS, sample_rows, result
+            output_dir / "samples.ecsv", SAMPLE_COLUMNS, sample_rows, meta
         )
         written["corridors_ecsv"] = _write_ecsv(
-            output_dir / "corridors.ecsv", CORRIDOR_COLUMNS, corridor_rows, result
+            output_dir / "corridors.ecsv", CORRIDOR_COLUMNS, corridor_rows, meta
         )
         if visibility_rows:
             written["visibility_ecsv"] = _write_ecsv(
-                output_dir / "visibility.ecsv", VISIBILITY_COLUMNS, visibility_rows, result
+                output_dir / "visibility.ecsv", VISIBILITY_COLUMNS, visibility_rows, meta
             )
         if pointing_rows:
             written["pointings_ecsv"] = _write_ecsv(
-                output_dir / "pointings.ecsv", POINTING_COLUMNS, pointing_rows, result
+                output_dir / "pointings.ecsv", POINTING_COLUMNS, pointing_rows, meta
             )
     if OutputFormat.JSON in formats:
         written["result_json"] = _write_json(output_dir / "result.json", result)
@@ -192,6 +215,141 @@ def result_manifest(
     return manifest
 
 
+def write_crossings_products(
+    result: CrossingsResult,
+    output_dir: str | Path,
+    *,
+    generated_utc: str,
+    input_file_hashes: Mapping[str, str] | None = None,
+) -> dict[str, Path]:
+    """Write every requested crossings format plus ``manifest.json``.
+
+    Products are the events table (one row per impact-parameter minimum or
+    invalid status row) and the windows table (one row per assumed beam
+    radius per event, joined by ``event_id``). Returns a label -> path
+    mapping of everything written.
+    """
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    formats = set(result.request.output_formats)
+    written: dict[str, Path] = {}
+
+    event_rows = [
+        _record_row(event, window_count=len(event.windows)) for event in result.events
+    ]
+    window_rows = [
+        _record_row(window) for event in result.events for window in event.windows
+    ]
+
+    meta = {
+        "crossings_result_schema_version": CROSSINGS_RESULT_SCHEMA_VERSION,
+        "crossings_id": result.crossings_id,
+        "model_id": result.request.model_id,
+        "warnings": list(result.warnings),
+    }
+    if OutputFormat.ECSV in formats:
+        written["events_ecsv"] = _write_ecsv(
+            output_dir / "events.ecsv", EVENT_COLUMNS, event_rows, meta
+        )
+        written["windows_ecsv"] = _write_ecsv(
+            output_dir / "windows.ecsv", WINDOW_COLUMNS, window_rows, meta
+        )
+    if OutputFormat.JSON in formats:
+        written["result_json"] = _write_crossings_json(
+            output_dir / "result.json", result, event_rows, window_rows
+        )
+    if OutputFormat.CSV in formats:
+        written["events_csv"] = _write_csv(
+            output_dir / "events.csv", EVENT_COLUMNS, event_rows
+        )
+        written["windows_csv"] = _write_csv(
+            output_dir / "windows.csv", WINDOW_COLUMNS, window_rows
+        )
+
+    manifest = crossings_manifest(
+        result,
+        generated_utc=generated_utc,
+        input_file_hashes=input_file_hashes or {},
+        output_files={label: file_sha256(path) for label, path in written.items()},
+    )
+    manifest_path = output_dir / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    written["manifest_json"] = manifest_path
+    return written
+
+
+def crossings_manifest(
+    result: CrossingsResult,
+    *,
+    generated_utc: str,
+    input_file_hashes: Mapping[str, str],
+    output_files: Mapping[str, str],
+) -> dict[str, Any]:
+    """Crossings manifest with science identity hashed apart from run data."""
+    axis_models = sorted(
+        {(e.axis_model_id, e.axis_model_version) for e in result.events}
+    )
+    science: dict[str, Any] = {
+        "crossings_result_schema_version": CROSSINGS_RESULT_SCHEMA_VERSION,
+        "crossings_id": result.crossings_id,
+        "request": _canonical_crossings_request(result),
+        "axis_models": [list(pair) for pair in axis_models],
+        "model_id": result.request.model_id,
+        "model_versions": sorted({e.model_version for e in result.events}),
+        "target_source_hashes": {
+            target_id: source_hash
+            for target_id, source_hash in sorted(
+                {(e.target_id, e.target_source_hash) for e in result.events}
+            )
+        },
+        "ephemeris_ids": sorted({e.ephemeris_id for e in result.events}),
+        "input_file_hashes": dict(sorted(input_file_hashes.items())),
+        "conventions": CONVENTIONS,
+    }
+    run = {
+        "generated_utc": generated_utc,
+        "output_files": dict(sorted(output_files.items())),
+        "warning_summary": list(result.warnings),
+        "event_count": len(result.events),
+        "window_count": sum(len(e.windows) for e in result.events),
+        "versions": _versions(),
+    }
+    return build_manifest(science_inputs=science, run_metadata=run)
+
+
+def _canonical_crossings_request(result: CrossingsResult) -> Any:
+    canonical = canonicalize(result.request)
+    # Content identity, never location (matches crossings_id handling).
+    ephemeris_ids = sorted({e.ephemeris_id for e in result.events})
+    canonical["fields"]["ephemeris"] = (
+        ephemeris_ids[0] if len(ephemeris_ids) == 1 else ephemeris_ids
+    )
+    return canonical
+
+
+def _write_crossings_json(
+    path: Path,
+    result: CrossingsResult,
+    event_rows: list[dict[str, Any]],
+    window_rows: list[dict[str, Any]],
+) -> Path:
+    document = {
+        "crossings_result_schema_version": CROSSINGS_RESULT_SCHEMA_VERSION,
+        "crossings_id": result.crossings_id,
+        "request": _canonical_crossings_request(result),
+        "warnings": list(result.warnings),
+        "events": [_json_safe(row) for row in event_rows],
+        "windows": [_json_safe(row) for row in window_rows],
+    }
+    path.write_text(
+        json.dumps(document, indent=2, sort_keys=True, allow_nan=False) + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
 def _versions() -> dict[str, str]:
     import platform
     from importlib.metadata import PackageNotFoundError, version
@@ -240,7 +398,7 @@ def _plain(value: Any) -> Any:
 def _record_row(record: Any, **extra: Any) -> dict[str, Any]:
     row = {**extra}
     for field in dataclasses.fields(record):
-        if field.name == "samples":
+        if field.name in ("samples", "windows"):
             continue
         row[field.name] = _plain(getattr(record, field.name))
     return row
@@ -269,7 +427,7 @@ def _write_ecsv(
     path: Path,
     columns: Sequence[str],
     rows: list[dict[str, Any]],
-    result: CalculationResult,
+    meta: Mapping[str, Any],
 ) -> Path:
     from astropy.table import Table
 
@@ -281,14 +439,7 @@ def _write_ecsv(
         unit = _column_unit(column)
         if unit is not None and len(rows):
             table[column].unit = unit
-    table.meta.update(
-        {
-            "result_schema_version": RESULT_SCHEMA_VERSION,
-            "calculation_id": result.calculation_id,
-            "model_id": result.request.model_id,
-            "warnings": list(result.warnings),
-        }
-    )
+    table.meta.update(meta)
     table.write(path, format="ascii.ecsv", overwrite=True)
     return path
 

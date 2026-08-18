@@ -24,12 +24,14 @@ from .errors import ConfigError
 from .models import (
     SUPPORTED_MODEL_IDS,
     CoordinateProduct,
+    CrossingsRequest,
     EphemerisAdapter,
     EphemerisSpec,
     Epoch,
     FieldOfView,
     GeometryRequest,
     IersSpec,
+    LinkDirection,
     ObservabilityConstraints,
     Observer,
     ObserverKind,
@@ -39,6 +41,7 @@ from .models import (
     SamplingKind,
     SamplingSpec,
     TimeGrid,
+    TimeInterval,
     TimeList,
     TimeSingle,
     TimeSpec,
@@ -48,13 +51,19 @@ if TYPE_CHECKING:
     from astropy.time import Time
 
 __all__ = [
+    "CROSSINGS_REQUEST_SCHEMA_VERSION",
     "REQUEST_SCHEMA_VERSION",
+    "load_crossings_request",
     "load_epoch_table",
     "load_request",
     "load_yaml",
 ]
 
 REQUEST_SCHEMA_VERSION = 1
+
+#: Crossings request files carry their own schema counter: the two request
+#: kinds evolve independently.
+CROSSINGS_REQUEST_SCHEMA_VERSION = 1
 
 #: Upper bound on materialized epochs from a grid; prevents accidental
 #: million-row requests from a typo'd cadence.
@@ -594,6 +603,178 @@ def _parse_products(
                 )
         formats = tuple(parsed_formats)
     return coordinates, rates, formats
+
+
+# ---------------------------------------------------------------------------
+# Crossings request (crossings schema v1)
+# ---------------------------------------------------------------------------
+
+_CROSSINGS_TOP_KEYS = {
+    "schema_version",
+    "targets",
+    "link_directions",
+    "intervals",
+    "observer",
+    "relay_distance_au",
+    "beam",
+    "scan",
+    "model",
+    "ephemeris",
+    "products",
+}
+
+
+def load_crossings_request(path: str | Path) -> CrossingsRequest:
+    """Load and strictly validate a beam-crossing search request YAML file.
+
+    Target IDs are validated structurally only; existence in a registry is
+    checked at search time, mirroring :func:`load_request`.
+    """
+    path = Path(path)
+    fail = _fail_factory(path)
+    data = load_yaml(path)
+    if data.get("schema_version") != CROSSINGS_REQUEST_SCHEMA_VERSION:
+        fail("schema_version", f"must be {CROSSINGS_REQUEST_SCHEMA_VERSION}")
+    _check_keys(data, _CROSSINGS_TOP_KEYS, "request", fail)
+
+    target_ids = _string_list(data.get("targets"), "targets", fail)
+    link_directions = _parse_link_directions(data.get("link_directions"), fail)
+    intervals = _parse_intervals(data.get("intervals"), fail)
+    observer = _parse_observer(data.get("observer"), fail)
+    relay_distance_au = _number(data, "relay_distance_au", "request", fail)
+    beam_radii_au, report_max_b_au = _parse_beam(data.get("beam"), fail)
+    coarse_step_days, refine_tolerance_s = _parse_scan(data.get("scan"), fail)
+    model_id = _parse_crossings_model(data.get("model"), fail)
+    ephemeris = _parse_ephemeris(data.get("ephemeris"), fail)
+    output_formats = _parse_crossings_products(data.get("products"), fail)
+
+    kwargs: dict[str, Any] = dict(
+        target_ids=target_ids,
+        link_directions=link_directions,
+        intervals=intervals,
+        observer=observer,
+        relay_distance_au=relay_distance_au,
+        model_id=model_id,
+        beam_radii_au=beam_radii_au,
+        report_max_b_au=report_max_b_au,
+        ephemeris=ephemeris,
+        output_formats=output_formats,
+    )
+    if coarse_step_days is not None:
+        kwargs["coarse_step_days"] = coarse_step_days
+    if refine_tolerance_s is not None:
+        kwargs["refine_tolerance_s"] = refine_tolerance_s
+    request: CrossingsRequest = _build("request", fail, CrossingsRequest, **kwargs)
+    return request
+
+
+def _parse_link_directions(raw: Any, fail: _Fail) -> tuple[LinkDirection, ...]:
+    names = _string_list(raw, "link_directions", fail)
+    if not names:
+        fail("link_directions", "must list at least one direction")
+    directions: list[LinkDirection] = []
+    for name in names:
+        try:
+            directions.append(LinkDirection(name))
+        except ValueError:
+            fail(
+                "link_directions",
+                f"unknown direction {name!r}; choose from "
+                f"{[d.value for d in LinkDirection]}",
+            )
+    return tuple(directions)
+
+
+def _parse_intervals(raw: Any, fail: _Fail) -> tuple[TimeInterval, ...]:
+    if not isinstance(raw, list) or not raw:
+        fail("intervals", "must be a non-empty list of interval mappings")
+    intervals: list[TimeInterval] = []
+    seen: set[str] = set()
+    for index, item in enumerate(raw):
+        ctx = f"intervals[{index}]"
+        entry = _mapping(item, ctx, fail)
+        _check_keys(entry, {"interval_id", "start_utc", "stop_utc"}, ctx, fail)
+        interval_id = _string(entry, "interval_id", ctx, fail)
+        if interval_id in seen:
+            fail(f"{ctx}.interval_id", f"duplicate interval_id {interval_id!r}")
+        seen.add(interval_id)
+        start = _parse_utc(entry.get("start_utc"), f"{ctx}.start_utc", fail)
+        stop = _parse_utc(entry.get("stop_utc"), f"{ctx}.stop_utc", fail)
+        intervals.append(
+            _build(
+                ctx, fail, TimeInterval, interval_id=interval_id, start=start, stop=stop
+            )
+        )
+    return tuple(intervals)
+
+
+def _parse_beam(raw: Any, fail: _Fail) -> tuple[tuple[float, ...], float | None]:
+    if raw is None:
+        return (), None
+    block = _mapping(raw, "beam", fail)
+    _check_keys(block, {"radii_au", "report_max_b_au"}, "beam", fail)
+    radii: tuple[float, ...] = ()
+    if "radii_au" in block:
+        values = block["radii_au"]
+        if not isinstance(values, list) or not all(
+            isinstance(v, (int, float)) and not isinstance(v, bool) for v in values
+        ):
+            fail("beam.radii_au", "must be a list of numbers")
+        radii = tuple(float(v) for v in values)
+    report_max = (
+        _number(block, "report_max_b_au", "beam", fail)
+        if "report_max_b_au" in block
+        else None
+    )
+    return radii, report_max
+
+
+def _parse_scan(raw: Any, fail: _Fail) -> tuple[float | None, float | None]:
+    if raw is None:
+        return None, None
+    block = _mapping(raw, "scan", fail)
+    _check_keys(block, {"coarse_step_days", "refine_tolerance_s"}, "scan", fail)
+    step = (
+        _number(block, "coarse_step_days", "scan", fail)
+        if "coarse_step_days" in block
+        else None
+    )
+    tolerance = (
+        _number(block, "refine_tolerance_s", "scan", fail)
+        if "refine_tolerance_s" in block
+        else None
+    )
+    return step, tolerance
+
+
+def _parse_crossings_model(raw: Any, fail: _Fail) -> str:
+    block = _mapping(raw, "model", fail)
+    # No parameters block: the crossing axis contract has none in v1.
+    _check_keys(block, {"id"}, "model", fail)
+    model_id = _string(block, "id", "model", fail)
+    if model_id not in SUPPORTED_MODEL_IDS:
+        fail("model.id", f"unknown model {model_id!r}; supported: {sorted(SUPPORTED_MODEL_IDS)}")
+    return model_id
+
+
+def _parse_crossings_products(raw: Any, fail: _Fail) -> tuple[OutputFormat, ...]:
+    if raw is None:
+        return (OutputFormat.ECSV, OutputFormat.JSON)
+    block = _mapping(raw, "products", fail)
+    _check_keys(block, {"formats"}, "products", fail)
+    if "formats" not in block:
+        return (OutputFormat.ECSV, OutputFormat.JSON)
+    names = _string_list(block["formats"], "products.formats", fail)
+    formats: list[OutputFormat] = []
+    for name in names:
+        try:
+            formats.append(OutputFormat(name))
+        except ValueError:
+            fail(
+                "products.formats",
+                f"unknown format {name!r}; choose from {[f.value for f in OutputFormat]}",
+            )
+    return tuple(formats)
 
 
 def _parse_uncertainty(raw: Any, fail: _Fail) -> float | None:
