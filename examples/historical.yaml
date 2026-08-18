@@ -1,0 +1,41 @@
+# Example archival (historical) calculation request for sglseti (schema v1).
+#
+# Generates Rx/Tx locus samples at exact historical epochs read from
+# historical_epochs.ecsv, keyed by caller-supplied epoch IDs so results can
+# be joined to an external archive query. sglseti performs no archive lookup.
+schema_version: 1
+
+targets: [barnard]
+roles: [rx, tx]
+
+time:
+  epochs_file: historical_epochs.ecsv
+
+observer:
+  kind: site
+  name: example-kitt-peak
+  longitude_deg: -111.6003
+  latitude_deg: 31.9583
+  height_m: 2096.0
+
+relay_range:
+  min_au: 550.0
+  max_au: 2500.0
+  sampling:
+    kind: count
+    count: 25
+
+model:
+  id: tusay2022_eq5_7_v1
+
+ephemeris:
+  adapter: astropy_builtin
+
+products:
+  coordinates: [icrs]
+  rates: false
+  formats: [ecsv, json]
+
+uncertainty:
+  # Assumed corridor half-width, NOT propagated catalog covariance.
+  assumed_half_width_arcsec: 30.0

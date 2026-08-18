@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.metadata
+from pathlib import Path
 
 import pytest
 
@@ -69,3 +70,61 @@ def test_domain_errors_exit_with_status_2(
 
 def test_config_error_is_a_domain_error() -> None:
     assert issubclass(ConfigError, SglsetiError)
+
+
+EXAMPLES = Path(__file__).resolve().parents[2] / "examples"
+
+
+def test_validate_targets_example(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["validate", "targets", str(EXAMPLES / "targets.yaml")]) == 0
+    out = capsys.readouterr().out
+    assert "OK: 1 target(s)" in out
+    assert "barnard" in out
+    assert "sha256:" in out
+
+
+def test_validate_request_examples(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["validate", "request", str(EXAMPLES / "historical.yaml")]) == 0
+    assert "4 listed epoch(s)" in capsys.readouterr().out
+    assert main(["validate", "request", str(EXAMPLES / "commensal-night.yaml")]) == 0
+    assert "grid at 600 s cadence" in capsys.readouterr().out
+
+
+def test_validate_targets_invalid_file_exits_2(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    bad = tmp_path / "targets.yaml"
+    bad.write_text("schema_version: 1\ntargets: {}\n", encoding="utf-8")
+    assert main(["validate", "targets", str(bad)]) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("error: ")
+    assert str(bad) in err
+
+
+def test_validate_targets_allow_missing_rv(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    registry = tmp_path / "targets.yaml"
+    registry.write_text(
+        """
+schema_version: 1
+targets:
+  test-star:
+    endpoint_kind: star
+    astrometry:
+      frame: icrs
+      ra_deg: 10.0
+      dec_deg: 10.0
+      parallax_mas: 100.0
+      pm_ra_cosdec_mas_per_yr: 0.0
+      pm_dec_mas_per_yr: 0.0
+      reference_epoch_jyear: 2016.0
+      reference_epoch_scale: tcb
+      source: example snapshot
+""",
+        encoding="utf-8",
+    )
+    assert main(["validate", "targets", str(registry)]) == 2
+    capsys.readouterr()
+    assert main(["validate", "targets", str(registry), "--allow-missing-rv"]) == 0
+    assert "missing_radial_velocity" in capsys.readouterr().out

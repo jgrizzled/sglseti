@@ -69,3 +69,8 @@ select = ["E", "F", "W", "I", "UP", "B"]
 python_version = "3.11"
 strict = true
 packages = ["sglseti"]
+
+[[tool.mypy.overrides]]
+module = ["astropy.*", "erfa.*"]
+ignore_missing_imports = true
+follow_imports = "skip"

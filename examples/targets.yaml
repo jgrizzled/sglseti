@@ -1,0 +1,29 @@
+# Example curated target registry for sglseti (schema v1).
+#
+# SAMPLE VALUES FOR DEMONSTRATION ONLY — not vetted for operational use.
+# Revalidate every astrometric value against an immutable catalog release
+# before any scientific calculation.
+schema_version: 1
+
+targets:
+  barnard:
+    display_name: "Barnard's Star"
+    endpoint_kind: star
+    priority: 1.0
+    tags: [tier1, high-proper-motion]
+    notes: >-
+      High-proper-motion example. Values frozen from a SIMBAD display of Gaia
+      DR3 astrometry using J2000 ICRS coordinates; demonstration only.
+    astrometry:
+      frame: icrs
+      ra_deg: 269.45207695861876
+      dec_deg: 4.693364966576667
+      parallax_mas: 546.9759
+      pm_ra_cosdec_mas_per_yr: -801.551
+      pm_dec_mas_per_yr: 10362.394
+      radial_velocity_km_s: -110.11
+      reference_epoch_jyear: 2000.0
+      reference_epoch_scale: tcb
+      source: >-
+        SIMBAD explicit object page displaying Gaia DR3 astrometry, captured
+        2026-08-17; demonstration snapshot, not an operational solution

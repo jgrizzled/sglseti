@@ -1,0 +1,14 @@
+# %ECSV 1.0
+# ---
+# datatype:
+# - {name: epoch_id, datatype: string, description: Caller-controlled stable join key}
+# - {name: time_utc, datatype: string, description: ISO-8601 timestamp with UTC designator or offset}
+# - {name: dataset_id, datatype: string, description: Example pass-through archive identifier}
+# meta:
+#   note: Example historical exposure midpoints; demonstration only.
+# schema: astropy-2.0
+epoch_id time_utc dataset_id
+archive-exposure-1 2012-06-01T05:30:00Z SURVEY-A-000123
+archive-exposure-2 2018-03-14T09:26:53Z SURVEY-B-004567
+archive-exposure-3 2021-11-06T03:14:00Z GBT-ALPHACEN-DEMO
+archive-exposure-4 2024-01-20T11:00:00+00:00 SURVEY-B-009876

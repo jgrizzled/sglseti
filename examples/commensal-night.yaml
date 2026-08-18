@@ -1,0 +1,52 @@
+# Example commensal-night calculation request for sglseti (schema v1).
+#
+# Generates current/future targets on a time grid with simple observability
+# constraints and circular-FOV pointing candidates. Pointings are unscheduled
+# candidate zones; scheduling belongs to the observatory.
+schema_version: 1
+
+targets: [barnard]
+roles: [rx, tx]
+
+time:
+  grid:
+    start_utc: "2026-12-15T01:00:00Z"
+    stop_utc: "2026-12-15T13:00:00Z"
+    cadence_s: 600.0
+
+observer:
+  kind: site
+  name: example-kitt-peak
+  longitude_deg: -111.6003
+  latitude_deg: 31.9583
+  height_m: 2096.0
+
+relay_range:
+  min_au: 550.0
+  max_au: 2500.0
+  sampling:
+    kind: reciprocal_step
+    step_arcsec: 15.0
+
+model:
+  id: tusay2022_eq5_7_v1
+
+ephemeris:
+  adapter: astropy_builtin
+
+products:
+  coordinates: [icrs, cirs, altaz]
+  rates: true
+  formats: [ecsv, json, csv, ds9]
+
+uncertainty:
+  assumed_half_width_arcsec: 30.0
+
+observability:
+  min_target_altitude_deg: 25.0
+  max_sun_altitude_deg: -12.0
+  min_moon_separation_deg: 20.0
+
+fov:
+  # Usable circular field radius (v1 supports circles only).
+  radius_arcsec: 204.0
