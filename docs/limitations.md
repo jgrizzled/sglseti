@@ -1,0 +1,55 @@
+# Limitations
+
+What sglseti v1 does **not** do, and where its numbers stop being trustworthy.
+
+## Scientific model
+
+- **Approximate light time.** `tusay2022_eq5_7_v1` implements the published
+  Tusay et al. (2022) eq. 5–7 approximation: ρ ≈ z, constant target
+  distance, and Solar motion neglected during local light travel (~0.1″
+  effect). It is not an iterative light-time solution and is never labeled
+  one. Accuracy claims are arcsecond-class, regardless of library
+  precision.
+- **Linear stellar motion only.** Catalog propagation is linear space
+  motion. Unresolved binaries and accelerating systems are *rejected at
+  registry load* (flags `unresolved_binary`, `accelerating_system`;
+  `endpoint_kind: other` unsupported); orbital endpoint models are a
+  future, differently-named model family. Propagation spans beyond ±75 yr
+  from the catalog reference epoch are flagged `long_propagation_span`.
+- **No covariance propagation.** Widths on corridors, regions, and
+  pointings are explicitly *assumed* pads, never propagated catalog
+  covariance ([ADR-0001](adr/0001-v1-geometry-model.md)). Narrow-field
+  scientific use requires an independently justified envelope.
+- **Apparent products are approximate.** CIRS/AltAz come from astropy's
+  frame machinery on finite-distance barycentric coordinates; they are
+  validated for internal consistency (<0.5″ against an independent
+  construction) but not against JPL Horizons. Refraction is never applied.
+- A missing radial velocity is either a load error or an explicit
+  degraded-status propagation with RV = 0 — perspective effects are then
+  unmodeled.
+
+## Product boundary
+
+- **No archive knowledge.** sglseti computes where a hypothesis would
+  appear; it does not know what data exist, was searched, or was covered —
+  and its outputs never claim any of that.
+- **No observation state.** No ledger, ingest, completion tracking,
+  sensitivity records, or candidate management (CI-enforced boundary gate).
+- **No scheduling.** Pointings are unscheduled candidate zones with
+  grid-sampled validity windows; conflict-free sequencing, exposure
+  planning, and telescope control belong to the observatory.
+- **Circular fields only.** Irregular FOVs, MOC/ST-MOC output, and VOTable
+  are post-v1.
+- Visibility numbers (geometric AltAz, inclusive thresholds) assist
+  planning; they do not replace an observatory's pointing and refraction
+  models.
+
+## Operational
+
+- Grids are sampled: windows and representative times are only as fine as
+  the requested cadence.
+- The committed test kernel excerpt covers 2010–2035; full DE440s covers
+  1849–2150. Epochs outside your kernel produce invalid rows by design.
+- Performance is laptop-scale by requirement (see
+  [benchmarks.md](benchmarks.md)); there is no parallel or distributed
+  execution.

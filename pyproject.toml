@@ -62,8 +62,6 @@ addopts = "-ra"
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-# Prototype slated for removal; not part of the sglseti package.
-extend-exclude = ["sgl-search-planner"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B"]

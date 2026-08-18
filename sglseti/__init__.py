@@ -21,7 +21,7 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING, Any
 
-__version__ = "0.1.0.dev0"
+__version__ = "1.0.0rc1"
 
 # name -> defining submodule, resolved lazily on attribute access.
 _EXPORTS = {

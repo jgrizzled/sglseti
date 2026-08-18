@@ -5,7 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0rc1] - 2026-08-17
+
+Release candidate for v1. All PRD v1 functionality is implemented and
+tested (`docs/release/v1-acceptance.md`); the final 1.0.0 tag is blocked on
+human astrometry-review sign-off (ADR-0001 review section) and a green CI
+platform matrix. Documentation set added: quick start, conventions and
+product reference, resources, limitations, from-the-prototype provenance,
+acceptance status, and benchmarks; release-gate tests added
+(network-blocked pinned-resource reproducibility; no-ledger/SQLite
+boundary).
 
 ### Added
 

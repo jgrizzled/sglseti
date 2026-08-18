@@ -24,9 +24,21 @@ output.
 
 ## Status
 
-Pre-release scaffold. The domain models, geometry engine
-(`tusay2022_eq5_7_v1`), sampling, generation, planning, and export layers are
-being implemented per `notes/implementation_plan.md`.
+Release candidate. All v1 functionality is implemented and tested (see
+`docs/release/v1-acceptance.md`); a final v1 tag awaits human
+astrometry-review sign-off (`docs/adr/0001-v1-geometry-model.md`) and a
+green CI platform matrix.
+
+## Documentation
+
+- [Quick start](docs/quickstart.md) — historical and commensal workflows
+- [Conventions and product reference](docs/conventions.md) — frames, time
+  scales, role epochs, every output column
+- [Resources](docs/resources.md) — pinned ephemeris kernels and IERS, offline
+- [Limitations](docs/limitations.md) — model validity and boundaries
+- [Science specification](docs/science/geometry_models.md) and
+  [ADRs](docs/adr/) — the reviewed `tusay2022_eq5_7_v1` contract
+- [From the prototype](docs/from-the-prototype.md) — ported code provenance
 
 ## Installation
 
@@ -44,29 +56,31 @@ python -m pip install -e .
 sglseti --help
 ```
 
-## Planned usage
+## Usage
 
-```python
-from astropy import units as u
-from astropy.time import Time
-from sglseti import Observer, RelayRange, TargetRegistry
-from sglseti.geometry import Tusay2022Eq57V1
-from sglseti.generate import generate_loci
-
-registry = TargetRegistry.from_yaml("examples/targets.yaml")
-result = generate_loci(
-    targets=[registry["barnard"]],
-    epochs=Time(["2021-11-06T03:14:00"], scale="utc"),
-    epoch_ids=["archive-exposure-1"],
-    observer=Observer.from_geodetic(...),
-    relay_range=RelayRange(550 * u.au, 2500 * u.au),
-    roles=("rx", "tx"),
-    model=Tusay2022Eq57V1(),
-)
-result.write_ecsv("loci.ecsv")
+```bash
+sglseti generate \
+  --targets examples/targets.yaml \
+  --request examples/historical.yaml \
+  --output-dir build/archive-targets
 ```
 
-(API sketch from the PRD; names may be refined before v1.)
+or from Python:
+
+```python
+from sglseti import generate_loci, load_request, load_target_registry, write_products
+
+registry = load_target_registry("examples/targets.yaml")
+result = generate_loci(load_request("examples/historical.yaml"), registry)
+write_products(result, "build/archive-targets",
+               generated_utc="2026-08-17T00:00:00+00:00")
+```
+
+Every output row keeps its caller-supplied `epoch_id` join key, its
+coordinate frame/origin/epoch semantics, model identity, resource
+checksums, and validity status; a `manifest.json` separates the
+deterministic science identity from run circumstance. See the
+[quick start](docs/quickstart.md).
 
 ## Ephemeris resources
 
