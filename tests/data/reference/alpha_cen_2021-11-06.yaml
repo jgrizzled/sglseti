@@ -1,0 +1,109 @@
+# Published-search epoch anchor: Tusay et al. (2022) Alpha Centauri
+# GBT session, UT 2021 November 6 (arXiv:2206.14807).
+#
+# Two comparisons ride on this fixture:
+#  1. REPRODUCIBILITY (primary, tight): the Phase 4 engine must reproduce the
+#     frozen values below, which come from tusay_eq57_reference.py — an
+#     independent, no-abstraction astropy transcription of the published
+#     equations 5-7 run 2026-08-17 (approximations documented in that
+#     script's docstring: builtin ephemeris, bundled IERS, SSB-origin target
+#     direction, TDB-assumed catalog epoch).
+#  2. PUBLICATION CONSISTENCY (loose): the antipode line of sight must fall
+#     in the paper's pointing region (their Figure 3; exact coordinates are
+#     not tabulated in the text). The paper targeted alpha Cen A, noting the
+#     A/B separation (<10 arcsec) is far below the GBT beam.
+#
+# The paper restricts probe placement to z < d/10 and neglects Solar motion
+# during Sun-probe light travel (stated effect ~0.1 arcsec); this model
+# inherits both.
+fixture_id: alpha_cen_2021-11-06_v1
+model_id: tusay2022_eq5_7_v1
+inputs:
+  target: alpha_cen_a
+  astrometry:                     # SIMBAD display captured 2026-08-17
+    frame: icrs
+    ra_deg: 219.90205833333331    # 14 39 36.49400 (2007A&A...474..653V)
+    dec_deg: -60.83399269444445   # -60 50 02.3737 (2007A&A...474..653V)
+    parallax_mas: 742.12          # 1997A&A...323L..49P
+    pm_ra_cosdec_mas_per_yr: -3679.25   # 2007A&A...474..653V
+    pm_dec_mas_per_yr: 473.67           # 2007A&A...474..653V
+    radial_velocity_km_s: -15.252       # 2021MNRAS.506..150B
+    reference_epoch_jyear: 2000.0
+    reference_epoch_scale: tdb          # SIMBAD J2000 display; sub-mas effect
+  observer:
+    name: gbt
+    source: NRAO Green Bank Telescope site coordinates
+    longitude_deg: -79.83983611111111   # 79d50m23.41s W
+    latitude_deg: 38.43312222222222     # 38d25m59.24s N
+    height_m: 807.43
+  t_o_utc: "2021-11-06T00:00:00"  # representative; paper gives the UT date only
+  t_o_tdb_jd: 2459524.500800724
+derived:
+  d_au: 277939.964220202
+  two_d_over_c_days: 3210.494716785445
+  sun_barycentric_au: [-0.00837373180897949, 0.003435055134134224, 0.001668528548890269]
+  observer_barycentric_au: [0.7108448148625865, 0.6294575134279693, 0.27307811985045866]
+expected:
+  antipode_z550:
+    catalog_epoch_tdb_jd: 2459524.500800724
+    target_dir_ra_deg: 219.856235763
+    target_dir_dec_deg: -60.831109692
+    los_ra_deg: 39.852021131
+    los_dec_deg: 60.904138567
+    rho_au: 549.2988273575071
+  rx_z550:
+    catalog_epoch_tdb_jd: 2459518.1477305596
+    target_dir_ra_deg: 219.856272252
+    target_dir_dec_deg: -60.831111994
+    los_ra_deg: 39.852057749
+    los_dec_deg: 60.904140873
+  tx_z550:
+    catalog_epoch_tdb_jd: 2462734.9955175095
+    target_dir_ra_deg: 219.83779518
+    target_dir_dec_deg: -60.829944924
+    los_ra_deg: 39.83351489
+    los_dec_deg: 60.90297173
+  antipode_z1000:
+    catalog_epoch_tdb_jd: 2459524.500800724
+    los_ra_deg: 39.853921432
+    los_dec_deg: 60.871252531
+  rx_z1000:
+    catalog_epoch_tdb_jd: 2459512.9497640613
+    los_ra_deg: 39.853987905
+    los_dec_deg: 60.871256721
+  tx_z1000:
+    catalog_epoch_tdb_jd: 2462734.9955175095
+    los_ra_deg: 39.835444795
+    los_dec_deg: 60.870086626
+  antipode_z2500:
+    catalog_epoch_tdb_jd: 2459524.500800724
+    los_ra_deg: 39.855311118
+    los_dec_deg: 60.847160073
+  rx_z2500:
+    catalog_epoch_tdb_jd: 2459495.6232090667
+    los_ra_deg: 39.855477105
+    los_dec_deg: 60.847170541
+  tx_z2500:
+    catalog_epoch_tdb_jd: 2462734.9955175095
+    los_ra_deg: 39.83685613
+    los_dec_deg: 60.845994851
+sanity:
+  rx_minus_antipode_ra_cosdec_arcsec_z550: 0.064   # = mu_ra* x 2z/c, sign +: mu_ra negative, earlier epoch
+  tx_minus_antipode_total_arcsec: ~32.6            # = mu_total x 8.79 yr
+tolerance:
+  reproducibility_arcsec: 2.0
+  rationale_reproducibility: >-
+    Engine vs reference script: differences limited to ephemeris choice,
+    UT1-UTC handling, and Sun-vs-SSB direction origin, each sub-arcsecond;
+    2 arcsec gives margin without hiding an epoch-sign error (smallest
+    signature: 0.064 arcsec in RA*cos(dec) between rx and antipode at
+    z=550 — the ROLE EPOCHS themselves are checked to 1e-6 day).
+  publication_consistency_arcmin: 15.0
+  rationale_publication: >-
+    Paper coordinates are read from a figure; representative time vs actual
+    scan times contributes intra-day parallax motion; beam-scale agreement
+    (GBT L-band FWHM ~9 arcmin) is the meaningful criterion.
+provenance:
+  reference_script: tusay_eq57_reference.py
+  generated: 2026-08-17
+  paper: "Tusay et al. 2022, arXiv:2206.14807 (eqs. 5-7, section I.3.2)"

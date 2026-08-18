@@ -1,0 +1,75 @@
+# Constant-velocity synthetic target: equivalence of the physical-event and
+# arrival-indexed catalog formulations, and the Rx/Tx role distinction.
+#
+# The star moves linearly with 10 arcsec/yr of purely transverse proper
+# motion (radial velocity exactly zero, so the constant-d and rho=z
+# approximations are exact and the fixture isolates epoch bookkeeping).
+#
+# For each role the frozen direction was computed two ways in the oracle:
+#   (a) catalog formulation: a(u_role), the arrival-indexed direction; and
+#   (b) physical formulation: unit(r(t_e)) at the solved emission event
+#       t_e = u_role - d/c.
+# These agree to < 1e-9 arcsec by construction. The Phase 4 test must
+# reproduce the SAME directions through astropy catalog propagation
+# (apply_space_motion) from the equivalent catalog parameters below — that
+# cross-convention agreement is the real content of this fixture.
+#
+# Source: generate_synthetic_fixtures.py (first-principles, no astropy),
+# run 2026-08-17. Synthetic uniform time in days; ICRS-like axes, SSB origin.
+fixture_id: constant_velocity_synthetic_v1
+model_id: tusay2022_eq5_7_v1
+inputs:
+  physical_state:
+    t0_days: 2459000.0
+    r0_au: [200000.0, 0.0, 0.0]
+    v_au_per_day: [0.0, 0.0265469503687631, 0.0]
+    radial_velocity: 0.0
+  equivalent_catalog_parameters:
+    # a(u0) = (1,0,0) exactly at the reference arrival epoch u0 = t0 + d0/c.
+    reference_arrival_epoch_u0_days: 2460155.10366629
+    ra_deg: 0.0
+    dec_deg: 0.0
+    d0_au: 200000.0
+    pm_ra_cosdec_arcsec_per_yr: 10.0
+    pm_dec_arcsec_per_yr: 0.0
+    radial_velocity_km_s: 0.0
+  t_o_days: 2459524.5
+  z_au: 1000.0
+  sun_barycentric_au: [0.004, -0.002, 0.001]
+  observer_barycentric_au: [0.5580, -0.7440, -0.3230]
+derived:
+  d_au_declared: 200000.00070062   # |r(t_e)| for the antipode arrival at t_o
+  two_z_over_c_days: 11.551036662874
+  two_d_over_c_days: 2310.20734066768
+expected:
+  antipode:
+    catalog_epoch_u_days: 2459524.5
+    physical_event_epoch_days: 2458369.39632967
+    target_dir_ra_deg: 359.995204170136
+    target_dir_dec_deg: 0.0
+    los_ra_deg: 179.95271690715
+    los_dec_deg: 0.0185535469920675
+  rx:
+    catalog_epoch_u_days: 2459512.94896334
+    physical_event_epoch_days: 2458357.84529285
+    target_dir_ra_deg: 359.995116322872
+    target_dir_dec_deg: 0.0
+    los_ra_deg: 179.95262910858
+    los_dec_deg: 0.0185535469709848
+  tx:
+    catalog_epoch_u_days: 2461834.70734067
+    physical_event_epoch_days: 2460679.60364567
+    target_dir_ra_deg: 0.0127736224644218
+    target_dir_dec_deg: 0.0
+    los_ra_deg: 179.97027662264
+    los_dec_deg: 0.0185535512091081
+sanity:
+  rx_minus_antipode_target_dir_arcsec: -0.316  # = -mu * 2z/c (earlier arrival epoch)
+  tx_minus_antipode_target_dir_arcsec: 63.25   # = +mu * 2d/c (later arrival epoch)
+tolerance:
+  direction_arcsec: 0.001
+  epoch_days_abs: 1.0e-6
+  rationale: >-
+    1 mas covers oracle-vs-ERFA differences for an exactly linear,
+    zero-radial-velocity star over ~6-year propagation spans; larger
+    deviations indicate an epoch-convention or sign error, not numerics.

@@ -1,0 +1,37 @@
+# Hand-checkable role-epoch light-time arithmetic for tusay2022_eq5_7_v1.
+#
+# Convention under test (SSB light-arrival catalog epochs, reconciliation
+# note section 7.1):
+#   antipode: u = t_o
+#   rx:       u = t_o - 2 z / c
+#   tx:       u = t_o + 2 d / c
+#
+# c = 299792458 m/s * 86400 s/day / 149597870700 m/au = 173.144632674240 au/day.
+# All values below are exact function of that constant; computed 2026-08-17.
+fixture_id: role_epoch_offsets_v1
+model_id: tusay2022_eq5_7_v1
+c_au_per_day: 173.14463267424
+rx_offsets:            # 2 z / c, in days
+  - {z_au: 550.0, two_z_over_c_days: 6.35307016458}
+  - {z_au: 1000.0, two_z_over_c_days: 11.551036662874}
+  - {z_au: 2500.0, two_z_over_c_days: 28.877591657185}
+tx_offsets:            # 2 d / c
+  - target: synthetic_200000_au
+    d_au: 200000.0
+    two_d_over_c_days: 2310.2073325748
+  - target: barnard_demo          # d = 1000/546.9759 mas -> pc -> au
+    parallax_mas: 546.9759
+    d_au: 377100.35533027386
+    two_d_over_c_days: 4355.900030002803
+    two_d_over_c_years: 11.925804325811917
+  - target: alpha_cen_a           # d = 1000/742.12 mas -> pc -> au
+    parallax_mas: 742.12
+    d_au: 277939.96422020206
+    two_d_over_c_days: 3210.494716785439
+    two_d_over_c_years: 8.789855487434467
+tolerance:
+  days_abs: 1.0e-6
+  rationale: pure arithmetic; any larger deviation is a sign or unit error.
+sources:
+  - "reconciliation note section 6 (6.35 d at 550 AU, 28.88 d at 2500 AU, 11.93 yr Barnard)"
+  - "1 pc = 648000/pi au (IAU); parallax values from examples/targets.yaml (demo) and SIMBAD (alpha Cen A)"

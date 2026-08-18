@@ -1,0 +1,25 @@
+# Solar minimum gravitational focal distance validation fixture.
+#
+# Derivation:  r_g = 2 G M_sun / c^2 ;  z_min = R_sun^2 / (2 r_g)
+# Computed 2026-08-17 from the constants below (see README.md); independent
+# of any package code.
+fixture_id: solar_focal_distance_v1
+constants:
+  GM_sun_m3_s2: 1.32712440018e+20  # IAU 2015 nominal solar mass parameter (TDB-compatible)
+  c_m_s: 299792458.0               # defining constant
+  R_sun_m: 6.957e+8                # IAU 2015 resolution B3 nominal solar radius
+  au_m: 149597870700.0             # IAU 2012 definition
+expected:
+  r_g_m: 2953.2500765008035
+  z_min_m: 81943363660803.12
+  z_min_au: 547.7575534823646
+tolerance:
+  z_min_au_abs: 0.01
+  rationale: >-
+    Exact arithmetic from defining/nominal constants; tolerance covers only
+    floating-point evaluation-order differences. An implementation using a
+    different R_sun (e.g. an opaque photospheric radius) must document its
+    constant and adjust the fixture, not widen the tolerance.
+notes: >-
+  The PRD quotes "approximately 547.8 AU". v1 does not force this as a search
+  prior; requests supply an explicit relay range and are warned below z_min.

@@ -1,0 +1,35 @@
+# NEGATIVE control: the double-retarded Rx construction must be DETECTED.
+#
+# Failure mode under test (reconciliation note sections 3.2 and 5.2): passing
+# the physical emission epoch t_e = u_rx - d/c to catalog propagation
+# (apply_space_motion) as if it were a catalog epoch. The catalog direction
+# is already retarded by the target-to-SSB light time, so this counts d/c
+# twice and shifts the target direction by ~ mu * d/c along the proper
+# motion — here 31.625 arcsec.
+#
+# A conforming implementation MUST match the correct Rx direction in
+# constant_velocity_synthetic.yaml and MUST differ from the wrong direction
+# below by at least min_detectable_offset_arcsec. If an engine ever matches
+# THIS fixture's direction, it has reintroduced the bug.
+#
+# Source: generate_synthetic_fixtures.py, run 2026-08-17. Same synthetic
+# star, epochs, and observer as constant_velocity_synthetic.yaml.
+fixture_id: double_retarded_negative_v1
+model_id: tusay2022_eq5_7_v1
+base_fixture: constant_velocity_synthetic_v1
+wrong_construction:
+  description: catalog direction evaluated at u_rx - d/c instead of u_rx
+  catalog_epoch_u_days: 2458357.845293
+  target_dir_ra_deg: 359.986331596532
+  target_dir_dec_deg: 0.0
+  los_ra_deg: 179.943849252165
+  los_dec_deg: 0.01855354486283
+expected_detection:
+  offset_from_correct_rx_arcsec: 31.6250147558138
+  analytic_offset_arcsec: 31.6250149304268   # mu * d/c
+  min_detectable_offset_arcsec: 1.0
+tolerance:
+  offset_arcsec_abs: 0.01
+  rationale: >-
+    The offset equals mu * d/c to first order; the test only needs to prove
+    the wrong construction is far outside the 1 mas direction tolerance.

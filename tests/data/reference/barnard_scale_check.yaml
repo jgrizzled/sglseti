@@ -1,0 +1,40 @@
+# Barnard's Star high-proper-motion scale and sign check.
+#
+# First-order expectations for the role-epoch corrections of
+# tusay2022_eq5_7_v1, using the demonstration astrometry in
+# examples/targets.yaml (marked non-operational there; adequate for a
+# scale/sign check, NOT for sub-arcsecond validation).
+#
+# Derivation (computed 2026-08-17, pure arithmetic):
+#   mu_total = hypot(-801.551, 10362.394) mas/yr = 10393.3485 mas/yr
+#   rx offset  = mu_total * (2z/c)   (target direction at an EARLIER arrival
+#                epoch: displaced along -mu from the antipode direction)
+#   tx offset  = mu_total * (2d/c)   (LATER arrival epoch: displaced along +mu)
+# Matches reconciliation note section 6 (~0.18", ~0.82", ~124", 11.93 yr).
+fixture_id: barnard_scale_check_v1
+model_id: tusay2022_eq5_7_v1
+inputs:
+  astrometry_source: examples/targets.yaml (demonstration values)
+  parallax_mas: 546.9759
+  pm_ra_cosdec_mas_per_yr: -801.551
+  pm_dec_mas_per_yr: 10362.394
+derived:
+  mu_total_mas_per_yr: 10393.348518010785
+  d_au: 377100.35533027386
+  two_d_over_c_years: 11.925804325811917
+expected:
+  rx_offset_from_antipode_arcsec:
+    z_550_au: 0.18077939049928352
+    z_2500_au: 0.8217245022694706
+  tx_offset_from_antipode_arcsec: 123.94904071576391
+  signs:
+    rx: displaced along MINUS the proper-motion vector (mostly southward here)
+    tx: displaced along PLUS the proper-motion vector (mostly northward here)
+    required: rx and tx displacements from antipode have opposite sense
+tolerance:
+  offset_fraction: 0.02
+  rationale: >-
+    First-order small-angle estimate; second-order terms (perspective
+    acceleration from the large radial velocity, parallax factors) are below
+    2 percent over these spans. The fixture checks scale and sign, not
+    sub-arcsecond values.

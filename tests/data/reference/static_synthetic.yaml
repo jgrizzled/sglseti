@@ -1,0 +1,43 @@
+# Static synthetic target: zero-motion limiting behavior.
+#
+# For a target with zero space motion, the arrival-indexed catalog direction
+# a(u) is the same for every role epoch, so antipode/rx/tx must yield one
+# identical target direction and one identical relay line of sight; only the
+# role epochs differ. Relay parallax (LOS vs target direction) remains
+# range-dependent.
+#
+# Source: generate_synthetic_fixtures.py (first-principles, no astropy),
+# run 2026-08-17. Synthetic uniform time in days; ICRS-like axes, SSB origin.
+fixture_id: static_synthetic_v1
+model_id: tusay2022_eq5_7_v1
+inputs:
+  t_o_days: 2459524.5
+  target:
+    kind: static_synthetic
+    direction: unit vector of (1, 1, 1)
+    d_au: 200000.0
+  z_au: 1000.0
+  sun_barycentric_au: [0.004, -0.002, 0.001]
+  observer_barycentric_au: [0.5580, -0.7440, -0.3230]
+derived:
+  two_z_over_c_days: 11.551036662874
+  two_d_over_c_days: 2310.2073325748
+expected:
+  # identical for all roles by construction:
+  target_dir_ra_deg: 45.0
+  target_dir_dec_deg: 35.2643896827547
+  los_ra_deg: 224.935682552947
+  los_dec_deg: -35.2536096700905
+  rho_au: 999.704834328788
+  rho_minus_z_au: -0.295165671211976
+  role_epochs_days:
+    antipode: 2459524.5
+    rx: 2459512.94896334
+    tx: 2461834.70733257
+tolerance:
+  direction_arcsec: 0.001
+  epoch_days_abs: 1.0e-6
+  rationale: >-
+    Pure geometry with exact inputs; 1 mas absorbs floating-point path
+    differences between the oracle and an astropy-based engine fed the same
+    synthetic vectors. Epoch tolerance is pure arithmetic.

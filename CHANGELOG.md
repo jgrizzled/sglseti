@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Reconciled science model codification (Phase 0): v1 geometry specification
+  (`docs/science/geometry_models.md`), ADR-0001 adopting
+  `tusay2022_eq5_7_v1` with SSB light-arrival catalog epochs and the
+  no-covariance-propagation cut line, the frozen `DirectionSolution`
+  contract (dataclass + field-drift test), and reviewed reference fixtures
+  under `tests/data/reference/` produced by two prototype-independent
+  oracles, including the double-retardation negative control.
 - Domain models and input validation (Phase 2): frozen dataclasses and enums
   for the scientific boundary (`sglseti.models`), strict curated target
   registry loading with normalized source hash and missing-radial-velocity

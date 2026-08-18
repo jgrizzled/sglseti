@@ -34,6 +34,7 @@ __all__ = [
     "CoordinateProduct",
     "CorrectionType",
     "Corridor",
+    "DirectionSolution",
     "EndpointKind",
     "Epoch",
     "EphemerisAdapter",
@@ -585,6 +586,42 @@ class GeometryRequest:
 # ---------------------------------------------------------------------------
 # Result records
 # ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class DirectionSolution:
+    """One role's propagated target direction with full epoch diagnostics.
+
+    The intermediate scientific result of a geometry model, per the frozen
+    Phase 0 contract in ``docs/science/geometry_models.md`` §4. The catalog
+    direction epoch is an SSB light-arrival epoch (Gaia/ERFA convention);
+    the physical target-event epoch is a separate diagnostic and is never an
+    input to catalog propagation in ``tusay2022_eq5_7_v1``.
+    """
+
+    model_id: str
+    model_version: str
+    role: Role
+    observation_epoch: Time
+    catalog_direction_epoch: Time
+    relay_event_epoch_approx: Time
+    solar_lens_epoch_approx: Time
+    target_event_epoch_approx: Time
+    target_event_kind: TargetEventKind
+    target_light_time_days: float
+    sun_relay_light_time_days: float
+    observer_relay_light_time_days_approx: float
+    target_direction_icrs_ra_deg: float
+    target_direction_icrs_dec_deg: float
+    validity: Validity
+    warnings: tuple[str, ...] = ()
+    catalog_epoch_semantics: str = "ssb_light_arrival_time"
+    # Approximation flags: fixed True for tusay2022_eq5_7_v1; present so
+    # future models can differ. Not per-sample toggles.
+    rho_equals_z_assumed: bool = True
+    constant_target_distance_assumed: bool = True
+    linear_stellar_motion_assumed: bool = True
+    solar_motion_neglected: bool = True
 
 
 @dataclass(frozen=True)
