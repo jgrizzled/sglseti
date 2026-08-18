@@ -1,0 +1,71 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sglseti"
+dynamic = ["version"]
+description = "Reproducible sky-target generation for solar gravitational lens (SGL) technosignature searches"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Justin Greene", email = "justin.greene5@gmail.com" }]
+keywords = [
+  "SETI",
+  "solar-gravitational-lens",
+  "technosignatures",
+  "astronomy",
+  "astrometry",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Astronomy",
+  "Typing :: Typed",
+]
+dependencies = [
+  "astropy>=7.0,<9",
+  "numpy>=1.26",
+  "PyYAML>=6.0",
+]
+
+[project.scripts]
+sglseti = "sglseti.cli:main"
+
+[dependency-groups]
+dev = [
+  { include-group = "test" },
+  { include-group = "lint" },
+]
+test = ["pytest>=8"]
+lint = ["ruff>=0.6", "mypy>=1.11", "types-PyYAML>=6.0"]
+
+[tool.hatch.version]
+path = "sglseti/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["sglseti"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+# Prototype slated for removal; not part of the sglseti package.
+extend-exclude = ["sgl-search-planner"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+packages = ["sglseti"]
