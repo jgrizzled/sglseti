@@ -117,6 +117,104 @@ def make_locus_sample(**overrides: Any) -> Any:
     return LocusSample(**values)
 
 
+def build_small_result(
+    *,
+    planned: bool = False,
+    ephemeris: Any | None = None,
+    **request_overrides: Any,
+) -> Any:
+    """A small, fully deterministic CalculationResult for export tests.
+
+    Uses a synthetic target and the fixture FakeEphemeris; with
+    ``planned=True`` a permissive-constraint commensal plan (visibility and
+    pointings) is attached.
+    """
+    from astropy.time import Time
+
+    from sglseti.generate import generate_loci
+    from sglseti.models import (
+        AstrometricState,
+        CoordinateProduct,
+        EndpointKind,
+        Epoch,
+        FieldOfView,
+        GeometryRequest,
+        ObservabilityConstraints,
+        Observer,
+        OutputFormat,
+        RelayRange,
+        Role,
+        SamplingKind,
+        SamplingSpec,
+        Target,
+        TimeList,
+    )
+    from sglseti.planning import plan_commensal
+    from sglseti.targets import TargetRegistry
+
+    target = Target(
+        target_id="synth",
+        display_name="Synthetic",
+        endpoint_kind=EndpointKind.STAR,
+        astrometry=AstrometricState(
+            ra_deg=10.0,
+            dec_deg=20.0,
+            pm_ra_cosdec_mas_per_yr=100.0,
+            pm_dec_mas_per_yr=-50.0,
+            reference_epoch_jyear=2016.0,
+            reference_epoch_scale="tdb",
+            source="export test values",
+            distance_pc=200_000.0 / AU_PER_PC,
+            radial_velocity_km_s=0.0,
+        ),
+    )
+    registry = TargetRegistry.from_targets((target,))
+    values: dict[str, Any] = dict(
+        target_ids=("synth",),
+        roles=(Role.RX, Role.TX),
+        time=TimeList(
+            epochs=(
+                Epoch(
+                    epoch_id="e1",
+                    time=Time("2021-11-06T00:00:00", scale="utc"),
+                    metadata={"dataset_id": "D1"},
+                ),
+                Epoch(epoch_id="e2", time=Time("2022-03-01T12:00:00", scale="utc")),
+            )
+        ),
+        observer=Observer.from_geodetic("test-site", -111.6003, 31.9583, 2096.0),
+        relay_range=RelayRange(550.0, 2500.0),
+        sampling=SamplingSpec(kind=SamplingKind.COUNT, count=3),
+        model_id="tusay2022_eq5_7_v1",
+        output_formats=(
+            OutputFormat.ECSV,
+            OutputFormat.JSON,
+            OutputFormat.CSV,
+            OutputFormat.DS9,
+        ),
+        assumed_half_width_arcsec=30.0,
+    )
+    if planned:
+        values.update(
+            include_rates=True,
+            coordinate_products=(CoordinateProduct.ICRS,),
+            observability=ObservabilityConstraints(
+                min_target_altitude_deg=-90.0,
+                max_sun_altitude_deg=90.0,
+                min_moon_separation_deg=0.0,
+            ),
+            fov=FieldOfView(radius_arcsec=3600.0, exposure_s=300.0),
+        )
+    values.update(request_overrides)
+    request = GeometryRequest(**values)
+    if ephemeris is None:
+        ephemeris = FakeEphemeris((0.004, -0.002, 0.001), (0.558, -0.744, -0.323))
+    result = generate_loci(request, registry, ephemeris=ephemeris)
+    if planned:
+        result = plan_commensal(result, registry, ephemeris=ephemeris)
+    return result
+
+
 def separation_arcsec(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
     """Great-circle separation, pure math (no astropy)."""
     p1, p2 = math.radians(dec1), math.radians(dec2)

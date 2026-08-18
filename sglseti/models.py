@@ -641,6 +641,16 @@ class GeometryRequest:
             raise ValueError(
                 "fov.exposure_s (motion padding) requires products.rates: true"
             )
+        if (
+            OutputFormat.DS9 in self.output_formats
+            and self.assumed_half_width_arcsec is None
+        ):
+            raise ValueError(
+                "ds9 region output requires an explicit "
+                "uncertainty.assumed_half_width_arcsec: regions carry a width, "
+                "and an unlabeled width would masquerade as propagated "
+                "uncertainty (ADR-0001)"
+            )
         if self.sampling.kind is SamplingKind.EXPLICIT:
             assert self.sampling.distances_au is not None
             low, high = self.relay_range.z_min_au, self.relay_range.z_max_au

@@ -9,10 +9,14 @@ from __future__ import annotations
 
 import argparse
 import sys
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from . import __version__
 from .errors import SglsetiError
+
+if TYPE_CHECKING:
+    from .models import CalculationResult, GeometryRequest
+    from .targets import TargetRegistry
 
 _DESCRIPTION = (
     "Generate reproducible solar-gravitational-lens (SGL) sky targets for "
@@ -78,6 +82,78 @@ def _cmd_samples(args: argparse.Namespace) -> int:
         )
     print(f"# {len(segments)} segment(s)", file=sys.stderr)
     return 0
+
+
+def _load_generation_inputs(
+    args: argparse.Namespace,
+) -> tuple[TargetRegistry, GeometryRequest, dict[str, str]]:
+    import dataclasses
+
+    from .config import load_epoch_table, load_request
+    from .models import TimeList
+    from .provenance import file_sha256
+    from .targets import load_target_registry
+
+    registry = load_target_registry(args.targets)
+    request = load_request(args.request)
+    input_hashes = {
+        "targets_yaml": file_sha256(args.targets),
+        "request_yaml": file_sha256(args.request),
+    }
+    if getattr(args, "epochs", None):
+        request = dataclasses.replace(
+            request, time=TimeList(epochs=load_epoch_table(args.epochs))
+        )
+        input_hashes["epochs_table"] = file_sha256(args.epochs)
+    return registry, request, input_hashes
+
+
+def _write_and_report(
+    result: CalculationResult, args: argparse.Namespace, input_hashes: dict[str, str]
+) -> int:
+    from datetime import UTC, datetime
+
+    from .export import write_products
+    from .models import Validity
+
+    written = write_products(
+        result,
+        args.output_dir,
+        generated_utc=datetime.now(UTC).isoformat(),
+        input_file_hashes=input_hashes,
+    )
+    invalid = sum(1 for s in result.samples if s.validity is Validity.INVALID)
+    print(f"calculation: {result.calculation_id}")
+    print(
+        f"samples: {len(result.samples)} ({invalid} invalid), "
+        f"corridors: {len(result.corridors)}, "
+        f"visibility: {len(result.visibility)}, pointings: {len(result.pointings)}"
+    )
+    for warning in result.warnings:
+        print(f"warning: {warning}", file=sys.stderr)
+    for label, path in sorted(written.items()):
+        print(f"{label}: {path}")
+    # Exit policy: 0 clean, 1 completed with invalid status rows, 2 usage.
+    return 1 if invalid else 0
+
+
+def _cmd_generate(args: argparse.Namespace) -> int:
+    from .generate import generate_loci
+
+    registry, request, input_hashes = _load_generation_inputs(args)
+    result = generate_loci(request, registry, strict=args.strict)
+    return _write_and_report(result, args, input_hashes)
+
+
+def _cmd_plan(args: argparse.Namespace) -> int:
+    from .generate import generate_loci
+    from .planning import plan_commensal
+
+    registry, request, input_hashes = _load_generation_inputs(args)
+    result = plan_commensal(
+        generate_loci(request, registry, strict=args.strict), registry
+    )
+    return _write_and_report(result, args, input_hashes)
 
 
 def _cmd_fetch_ephemeris(args: argparse.Namespace) -> int:
@@ -157,6 +233,49 @@ def build_parser() -> argparse.ArgumentParser:
     )
     samples.add_argument("--request", required=True, help="Path to the request YAML.")
     samples.set_defaults(func=_cmd_samples)
+
+    generate = subcommands.add_parser(
+        "generate",
+        help=(
+            "Generate locus/corridor products for a request's epochs. Archive "
+            "lookup and search-coverage tracking happen in external systems."
+        ),
+    )
+    generate.add_argument("--targets", required=True, help="Target registry YAML.")
+    generate.add_argument("--request", required=True, help="Calculation request YAML.")
+    generate.add_argument(
+        "--epochs",
+        help=(
+            "Optional ECSV/CSV epoch table overriding the request's time mode "
+            "(stable epoch_id join keys are preserved)."
+        ),
+    )
+    generate.add_argument(
+        "--output-dir", required=True, help="Directory for product files."
+    )
+    generate.add_argument(
+        "--strict",
+        action="store_true",
+        help="Fail the whole batch on the first invalid sample.",
+    )
+    generate.set_defaults(func=_cmd_generate)
+
+    plan = subcommands.add_parser(
+        "plan",
+        help=(
+            "Generate loci plus visibility and candidate circular-FOV "
+            "pointings (unscheduled candidate zones, not a schedule)."
+        ),
+    )
+    plan.add_argument("--targets", required=True, help="Target registry YAML.")
+    plan.add_argument("--request", required=True, help="Calculation request YAML.")
+    plan.add_argument("--output-dir", required=True, help="Directory for product files.")
+    plan.add_argument(
+        "--strict",
+        action="store_true",
+        help="Fail the whole batch on the first invalid sample.",
+    )
+    plan.set_defaults(func=_cmd_plan)
 
     fetch = subcommands.add_parser(
         "fetch",

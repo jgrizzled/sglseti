@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Exports and full CLI (Phase 7): ECSV (canonical, with units and table
+  metadata), lossless versioned JSON (NaN → null), deterministic
+  unit-suffixed CSV, and DS9 regions (corridor polylines + assumed-width
+  circles, pointing circles; invalid samples omitted and counted) — all
+  from the same typed result objects with no geometry imports; a provenance
+  manifest with every product (science identity hashed apart from run
+  metadata, output/input file checksums, library versions, conventions);
+  `sglseti generate` (with `--epochs` override and `--strict`) and
+  `sglseti plan` CLI commands with the documented exit policy (0 clean,
+  1 completed-with-invalid-rows, 2 usage/domain errors); request
+  validation now refuses DS9 output without an explicit assumed half-width
+  (ADR-0001). VOTable slips per the v1 cut line.
 - Observability and commensal planning (Phase 6): site context per locus
   (AltAz altitude/azimuth, Sun altitude, Moon separation — Moon added to
   the `Ephemeris` protocol and to the committed DE440s excerpt kernel),

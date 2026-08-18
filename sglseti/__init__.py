@@ -41,6 +41,9 @@ _EXPORTS = {
     "GenerationError": "sglseti.errors",
     "PlanningError": "sglseti.errors",
     "plan_commensal": "sglseti.planning",
+    "write_products": "sglseti.export",
+    "result_manifest": "sglseti.export",
+    "RESULT_SCHEMA_VERSION": "sglseti.export",
     "VisibilityWindow": "sglseti.observability",
     "find_windows": "sglseti.observability",
     "visibility_sample": "sglseti.observability",
@@ -103,6 +106,7 @@ if TYPE_CHECKING:
         PlanningError,
         SglsetiError,
     )
+    from .export import RESULT_SCHEMA_VERSION, result_manifest, write_products
     from .generate import generate_loci, materialize_epochs
     from .geometry import Tusay2022Eq57V1, compute_relay_solution, motion_rates
     from .models import (
