@@ -13,8 +13,6 @@ is never silently replaced with zero.
 
 from __future__ import annotations
 
-import hashlib
-import json
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,6 +20,7 @@ from typing import Any, Literal
 
 from .config import _build, _check_keys, _fail_factory, _mapping, _number, load_yaml
 from .models import AstrometricState, EndpointKind, Target
+from .provenance import stable_hash
 
 __all__ = [
     "TARGETS_SCHEMA_VERSION",
@@ -120,11 +119,10 @@ class TargetRegistry:
     @classmethod
     def from_targets(cls, targets: tuple[Target, ...]) -> TargetRegistry:
         registry = cls(targets=targets, source_hash="")
-        canonical = json.dumps(
-            registry.to_normalized_dict(), sort_keys=True, separators=(",", ":")
+        return cls(
+            targets=targets,
+            source_hash=stable_hash(registry.to_normalized_dict()),
         )
-        digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-        return cls(targets=targets, source_hash=f"sha256:{digest}")
 
     @classmethod
     def from_yaml(

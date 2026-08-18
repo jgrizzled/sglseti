@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Sampling and provenance primitives (Phase 3): reciprocal-distance
+  relay-range partitioning into deterministic `RangeSegment`s
+  (`sglseti.sampling`; count, angular-step, and explicit-distance policies;
+  exact endpoint bounds; no coverage semantics), versioned canonical
+  serialization and stable hashing with typed serializers for
+  time/quantity/enum/dataclass values and path rejection
+  (`sglseti.provenance`), science-vs-run manifest builder, `request_id`,
+  registry hashing unified onto the canonical schema, and the ephemeris-free
+  `sglseti samples` CLI command with golden identity tests.
 - Reconciled science model codification (Phase 0): v1 geometry specification
   (`docs/science/geometry_models.md`), ADR-0001 adopting
   `tusay2022_eq5_7_v1` with SSB light-arrival catalog epochs and the

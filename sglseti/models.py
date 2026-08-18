@@ -47,6 +47,7 @@ __all__ = [
     "ObserverKind",
     "OutputFormat",
     "Pointing",
+    "RangeSegment",
     "RelayRange",
     "Role",
     "SamplingKind",
@@ -413,6 +414,57 @@ class SamplingSpec:
             pairs = zip(self.distances_au, self.distances_au[1:], strict=False)
             if any(b <= a for a, b in pairs):
                 raise ValueError("distances_au must be strictly increasing")
+
+
+@dataclass(frozen=True)
+class RangeSegment:
+    """One deterministic reciprocal-distance interval of a relay range.
+
+    Identity is physical: it depends on target, role, and the exact distance
+    bounds — never on the requested calendar date (PRD §7.7). ``z_rep_au``
+    is the reciprocal-midpoint representative distance at which the segment
+    is evaluated. Explicit distance samples are zero-width segments
+    (``is_point=True``). There are no coverage or completion semantics.
+    """
+
+    segment_id: str
+    target_id: str
+    role: Role
+    index: int
+    z_near_au: float
+    z_far_au: float
+    q_lo_per_au: float  # 1 / z_far
+    q_hi_per_au: float  # 1 / z_near
+    z_rep_au: float
+    is_point: bool = False
+
+    def __post_init__(self) -> None:
+        if not _ID_PATTERN.match(self.target_id):
+            raise ValueError(f"invalid target ID {self.target_id!r}")
+        if self.index < 0:
+            raise ValueError(f"index must be non-negative, got {self.index}")
+        for name, value in (
+            ("z_near_au", self.z_near_au),
+            ("z_far_au", self.z_far_au),
+            ("q_lo_per_au", self.q_lo_per_au),
+            ("q_hi_per_au", self.q_hi_per_au),
+            ("z_rep_au", self.z_rep_au),
+        ):
+            _require_finite(name, value)
+            if value <= 0.0:
+                raise ValueError(f"{name} must be positive, got {value}")
+        if self.is_point:
+            if not (self.z_near_au == self.z_far_au == self.z_rep_au):
+                raise ValueError("a point segment requires z_near == z_far == z_rep")
+        else:
+            if not self.z_near_au < self.z_far_au:
+                raise ValueError(
+                    f"z_near_au ({self.z_near_au}) must be below z_far_au ({self.z_far_au})"
+                )
+            if not self.z_near_au <= self.z_rep_au <= self.z_far_au:
+                raise ValueError("z_rep_au must lie within [z_near_au, z_far_au]")
+        if self.q_lo_per_au > self.q_hi_per_au:
+            raise ValueError("q_lo_per_au must not exceed q_hi_per_au")
 
 
 @dataclass(frozen=True)

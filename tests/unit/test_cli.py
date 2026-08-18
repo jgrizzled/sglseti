@@ -101,6 +101,35 @@ def test_validate_targets_invalid_file_exits_2(
     assert str(bad) in err
 
 
+def test_samples_command(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["samples", "--request", str(EXAMPLES / "historical.yaml")]) == 0
+    captured = capsys.readouterr()
+    lines = captured.out.strip().splitlines()
+    assert lines[0].startswith("segment_id\ttarget_id\trole")
+    assert len(lines) == 1 + 50  # header + 25 segments x 2 roles
+    first = lines[1].split("\t")
+    assert first[1] == "barnard"
+    assert first[2] == "rx"
+    assert first[3] == "550.000000"
+    assert "# 50 segment(s)" in captured.err
+
+
+def test_samples_command_deterministic(capsys: pytest.CaptureFixture[str]) -> None:
+    main(["samples", "--request", str(EXAMPLES / "historical.yaml")])
+    first = capsys.readouterr().out
+    main(["samples", "--request", str(EXAMPLES / "historical.yaml")])
+    assert capsys.readouterr().out == first
+
+
+def test_samples_invalid_request_exits_2(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    bad = tmp_path / "request.yaml"
+    bad.write_text("schema_version: 1\n", encoding="utf-8")
+    assert main(["samples", "--request", str(bad)]) == 2
+    assert "error: " in capsys.readouterr().err
+
+
 def test_validate_targets_allow_missing_rv(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

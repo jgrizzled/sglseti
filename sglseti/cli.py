@@ -61,6 +61,25 @@ def _cmd_validate_request(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_samples(args: argparse.Namespace) -> int:
+    from .config import load_request
+    from .sampling import segments_for_request
+
+    segments = segments_for_request(load_request(args.request))
+    print(
+        "segment_id\ttarget_id\trole\tz_near_au\tz_rep_au\tz_far_au"
+        "\tq_hi_per_au\tq_lo_per_au"
+    )
+    for segment in segments:
+        print(
+            f"{segment.segment_id}\t{segment.target_id}\t{segment.role.value}\t"
+            f"{segment.z_near_au:.6f}\t{segment.z_rep_au:.6f}\t{segment.z_far_au:.6f}\t"
+            f"{segment.q_hi_per_au:.12e}\t{segment.q_lo_per_au:.12e}"
+        )
+    print(f"# {len(segments)} segment(s)", file=sys.stderr)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="sglseti",
@@ -101,6 +120,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     validate_request.add_argument("path", help="Path to the request YAML.")
     validate_request.set_defaults(func=_cmd_validate_request)
+
+    samples = subcommands.add_parser(
+        "samples",
+        help=(
+            "List a request's deterministic relay-range segments without "
+            "computing any astronomy."
+        ),
+    )
+    samples.add_argument("--request", required=True, help="Path to the request YAML.")
+    samples.set_defaults(func=_cmd_samples)
 
     return parser
 

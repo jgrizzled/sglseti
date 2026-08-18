@@ -58,10 +58,19 @@ _EXPORTS = {
     "VisibilitySample": "sglseti.models",
     "Pointing": "sglseti.models",
     "CalculationResult": "sglseti.models",
+    "RangeSegment": "sglseti.models",
     "TargetRegistry": "sglseti.targets",
     "load_target_registry": "sglseti.targets",
     "load_request": "sglseti.config",
     "load_epoch_table": "sglseti.config",
+    "generate_segments": "sglseti.sampling",
+    "segments_for_request": "sglseti.sampling",
+    "build_manifest": "sglseti.provenance",
+    "canonical_json": "sglseti.provenance",
+    "file_sha256": "sglseti.provenance",
+    "request_id": "sglseti.provenance",
+    "stable_hash": "sglseti.provenance",
+    "stable_id": "sglseti.provenance",
 }
 
 __all__ = ["__version__", *sorted(_EXPORTS)]
@@ -89,6 +98,7 @@ if TYPE_CHECKING:
         ObserverKind,
         OutputFormat,
         Pointing,
+        RangeSegment,
         RelayRange,
         Role,
         SamplingKind,
@@ -102,6 +112,15 @@ if TYPE_CHECKING:
         Validity,
         VisibilitySample,
     )
+    from .provenance import (
+        build_manifest,
+        canonical_json,
+        file_sha256,
+        request_id,
+        stable_hash,
+        stable_id,
+    )
+    from .sampling import generate_segments, segments_for_request
     from .targets import TargetRegistry, load_target_registry
 
 
