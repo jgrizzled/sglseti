@@ -1,0 +1,19 @@
+schema_version: 1
+
+targets:
+  barnard:
+    display_name: "Barnard's Star"
+    priority: 1.0
+    tags: [tier1, single-star, high-proper-motion]
+    notes: >-
+      Example target. Values are frozen from a SIMBAD display using J2000 ICRS
+      coordinates and Gaia DR3 proper motion/parallax. Revalidate before a real campaign.
+    astrometry:
+      ra_deg: 269.45207695861876
+      dec_deg: 4.693364966576667
+      parallax_mas: 546.9759
+      pm_ra_cosdec_mas_per_yr: -801.551
+      pm_dec_mas_per_yr: 10362.394
+      radial_velocity_km_s: -110.11
+      reference_epoch_jyear: 2000.0
+      source: "SIMBAD explicit object page; astrometric values displayed 2026-08-17"
