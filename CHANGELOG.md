@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Geometry core (Phase 4): `GeometryModel`/`Ephemeris` protocols, the
+  reviewed `tusay2022_eq5_7_v1` model with SSB light-arrival catalog epochs,
+  physical-event diagnostics, declared target-distance approximation, and
+  machine-readable validity (`z > d/10` invalid; sub-focal, long-span, and
+  missing-RV warnings); astropy ephemeris adapter (builtin + checksummed
+  local JPL kernels, coverage errors, scoped offline IERS policy — no
+  process-global mutation); barycentric relay projection with geometric ICRS
+  line of sight; apparent CIRS/AltAz via the full barycentric-cartesian
+  transform; central finite-difference motion rates; regression suite
+  passing all Phase 0 reference fixtures including the double-retardation
+  negative control and the Alpha Centauri published-epoch anchor.
 - Sampling and provenance primitives (Phase 3): reciprocal-distance
   relay-range partitioning into deterministic `RangeSegment`s
   (`sglseti.sampling`; count, angular-step, and explicit-distance policies;

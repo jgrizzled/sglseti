@@ -66,11 +66,14 @@ extend-exclude = ["sgl-search-planner"]
 select = ["E", "F", "W", "I", "UP", "B"]
 
 [tool.mypy]
-python_version = "3.11"
+# 3.12: numpy's stubs use `type` statements that mypy rejects under a 3.11
+# target. 3.11 compatibility is covered by ruff (target-version py311) and
+# the CI test matrix.
+python_version = "3.12"
 strict = true
 packages = ["sglseti"]
 
 [[tool.mypy.overrides]]
-module = ["astropy.*", "erfa.*"]
+module = ["astropy.*", "erfa.*", "jplephem.*", "numpy.*"]
 ignore_missing_imports = true
 follow_imports = "skip"

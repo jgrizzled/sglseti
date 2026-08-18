@@ -149,9 +149,20 @@ def test_segments_for_request_ordering() -> None:
 
 
 def test_no_ephemeris_or_geometry_needed() -> None:
-    # Exit criterion: sample tables and IDs generate without an ephemeris.
+    # Exit criterion: sample tables and IDs generate without an ephemeris —
+    # checked in a subprocess so imports by other tests cannot mask it.
+    import subprocess
     import sys
 
-    assert "sglseti.geometry" not in sys.modules
-    assert "sglseti.ephemeris" not in sys.modules
-    barnard_rx()
+    probe = (
+        "import sys\n"
+        "from sglseti.sampling import generate_segments\n"
+        "from sglseti.models import RelayRange, Role, SamplingKind, SamplingSpec\n"
+        "segments = generate_segments(target_id='t', role=Role.RX,\n"
+        "    relay_range=RelayRange(550.0, 2500.0),\n"
+        "    sampling=SamplingSpec(kind=SamplingKind.COUNT, count=5))\n"
+        "assert len(segments) == 5\n"
+        "for module in ('sglseti.geometry', 'sglseti.ephemeris', 'astropy'):\n"
+        "    assert module not in sys.modules, module\n"
+    )
+    subprocess.run([sys.executable, "-c", probe], check=True)

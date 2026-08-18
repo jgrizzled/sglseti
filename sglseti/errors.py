@@ -7,7 +7,12 @@ programming errors keep their tracebacks.
 
 from __future__ import annotations
 
-__all__ = ["ConfigError", "SglsetiError"]
+__all__ = [
+    "ConfigError",
+    "EphemerisCoverageError",
+    "EphemerisError",
+    "SglsetiError",
+]
 
 
 class SglsetiError(Exception):
@@ -16,3 +21,11 @@ class SglsetiError(Exception):
 
 class ConfigError(SglsetiError):
     """Raised when a configuration or input file is invalid."""
+
+
+class EphemerisError(SglsetiError):
+    """Raised when an ephemeris resource is missing, unreadable, or unusable."""
+
+
+class EphemerisCoverageError(EphemerisError):
+    """Raised when a requested epoch lies outside the ephemeris coverage."""

@@ -27,6 +27,12 @@ __version__ = "0.1.0.dev0"
 _EXPORTS = {
     "SglsetiError": "sglseti.errors",
     "ConfigError": "sglseti.errors",
+    "EphemerisError": "sglseti.errors",
+    "EphemerisCoverageError": "sglseti.errors",
+    "AstropyEphemeris": "sglseti.ephemeris",
+    "Tusay2022Eq57V1": "sglseti.geometry",
+    "compute_relay_solution": "sglseti.geometry",
+    "motion_rates": "sglseti.geometry",
     "Role": "sglseti.models",
     "EndpointKind": "sglseti.models",
     "Validity": "sglseti.models",
@@ -77,7 +83,14 @@ __all__ = ["__version__", *sorted(_EXPORTS)]
 
 if TYPE_CHECKING:
     from .config import load_epoch_table, load_request
-    from .errors import ConfigError, SglsetiError
+    from .ephemeris import AstropyEphemeris
+    from .errors import (
+        ConfigError,
+        EphemerisCoverageError,
+        EphemerisError,
+        SglsetiError,
+    )
+    from .geometry import Tusay2022Eq57V1, compute_relay_solution, motion_rates
     from .models import (
         SUPPORTED_MODEL_IDS,
         AstrometricState,
