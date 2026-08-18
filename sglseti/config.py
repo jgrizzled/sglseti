@@ -611,8 +611,15 @@ def _parse_fov(raw: Any, fail: _Fail) -> FieldOfView | None:
     if raw is None:
         return None
     block = _mapping(raw, "fov", fail)
-    _check_keys(block, {"radius_arcsec"}, "fov", fail)
+    # Only circular fields exist in v1: any shape key is rejected as unknown.
+    _check_keys(block, {"radius_arcsec", "exposure_s"}, "fov", fail)
     fov: FieldOfView = _build(
-        "fov", fail, FieldOfView, radius_arcsec=_number(block, "radius_arcsec", "fov", fail)
+        "fov",
+        fail,
+        FieldOfView,
+        radius_arcsec=_number(block, "radius_arcsec", "fov", fail),
+        exposure_s=(
+            _number(block, "exposure_s", "fov", fail) if "exposure_s" in block else None
+        ),
     )
     return fov

@@ -50,3 +50,5 @@ observability:
 fov:
   # Usable circular field radius (v1 supports circles only).
   radius_arcsec: 204.0
+  # Enables half-exposure motion padding on pointings (requires rates).
+  exposure_s: 300.0

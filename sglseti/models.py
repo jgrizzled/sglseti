@@ -550,14 +550,23 @@ class ObservabilityConstraints:
 
 @dataclass(frozen=True)
 class FieldOfView:
-    """Circular usable field of view for pointing grouping (v1: circles only)."""
+    """Circular usable field of view for pointing grouping (v1: circles only).
+
+    ``exposure_s``, when given, enables half-exposure motion padding on
+    pointings (requires rates in the calculation products).
+    """
 
     radius_arcsec: float
+    exposure_s: float | None = None
 
     def __post_init__(self) -> None:
         _require_finite("radius_arcsec", self.radius_arcsec)
         if self.radius_arcsec <= 0.0:
             raise ValueError(f"radius_arcsec must be positive, got {self.radius_arcsec}")
+        if self.exposure_s is not None:
+            _require_finite("exposure_s", self.exposure_s)
+            if self.exposure_s <= 0.0:
+                raise ValueError(f"exposure_s must be positive, got {self.exposure_s}")
 
 
 @dataclass(frozen=True)
@@ -624,6 +633,14 @@ class GeometryRequest:
             _require_finite("assumed_half_width_arcsec", self.assumed_half_width_arcsec)
             if self.assumed_half_width_arcsec <= 0.0:
                 raise ValueError("assumed_half_width_arcsec must be positive")
+        if (
+            self.fov is not None
+            and self.fov.exposure_s is not None
+            and not self.include_rates
+        ):
+            raise ValueError(
+                "fov.exposure_s (motion padding) requires products.rates: true"
+            )
         if self.sampling.kind is SamplingKind.EXPLICIT:
             assert self.sampling.distances_au is not None
             low, high = self.relay_range.z_min_au, self.relay_range.z_max_au
@@ -775,6 +792,10 @@ class Pointing:
     """A conservative circular candidate zone over adjacent relay segments.
 
     Pointings are unscheduled candidate zones, never a scheduled sequence.
+    ``radius_arcsec`` is the conservative total; its components are kept
+    separate so an assumed width is never mistaken for propagated
+    covariance: ``radius = track_extent + (assumed or propagated half
+    width) + motion_padding``.
     """
 
     pointing_id: str
@@ -790,6 +811,11 @@ class Pointing:
     window_start_utc: str | None = None
     window_stop_utc: str | None = None
     warnings: tuple[str, ...] = ()
+    # Conservative-radius components (plan §Phase 6 task 5):
+    track_extent_arcsec: float = 0.0
+    assumed_half_width_arcsec: float | None = None
+    propagated_half_width_arcsec: float | None = None  # v1: never set
+    motion_padding_arcsec: float = 0.0
 
 
 @dataclass(frozen=True)

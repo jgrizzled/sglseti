@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Observability and commensal planning (Phase 6): site context per locus
+  (AltAz altitude/azimuth, Sun altitude, Moon separation — Moon added to
+  the `Ephemeris` protocol and to the committed DE440s excerpt kernel),
+  inclusive-threshold constraint evaluation with machine-readable failure
+  codes, every-contiguous-window finding with documented middle-epoch
+  representatives (no hidden "best time"), greedy adjacent circular-FOV
+  grouping with separately-reported radius components (track extent,
+  assumed half-width, half-exposure motion padding via `fov.exposure_s`),
+  and stateless `plan_commensal()` attaching visibility and
+  priority/epoch-ordered candidate pointings to a generated result —
+  no ledger, no schedule.
 - Epoch-neutral batch generator (Phase 5): `generate_loci(request, registry)`
   produces the deterministic targets × roles × epochs × segments product as
   `LocusSample` rows plus one `Corridor` per target/role/epoch, with

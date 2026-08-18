@@ -14,15 +14,19 @@ real, offline, checksum-pinned regression path in default CI.
 - Excerpt command (jplephem 2.24):
 
   ```bash
-  python -m jplephem excerpt --targets 3,10,399 2010/1/1 2035/1/1 \
+  python -m jplephem excerpt --targets 3,10,301,399 2010/1/1 2035/1/1 \
       de440s.bsp de440s_excerpt_2010-2035.bsp
   ```
 
 - Resulting segments: SSB→Earth barycenter (3), SSB→Sun (10),
-  EMB→Earth (399); coverage 2010-01-01 through 2035-01-01; 1,161,536 bytes.
+  EMB→Moon (301), EMB→Earth (399); coverage 2010-01-01 through 2035-01-01;
+  1,910,720 bytes.
 - Excerpt SHA-256:
-  `eca51b9422e7d3d0266b271757f575671dca585cf4cd744a87cbf4870d5f7530`
+  `fcd8bc4ae5a3fe6abbb7033a12c581c2e71f737a3a2feb78375e66059697fee1`
   (pinned in `tests/regression/test_jpl_kernel.py`).
+- History: regenerated 2026-08-17 to add the Moon segment (301) required by
+  Phase 6 observability (Moon-separation constraints); previous excerpt
+  (`sha256:eca51b94…`) had only Sun/EMB/Earth.
 
 An excerpt is a *derived* resource: its checksum intentionally differs from
 DE440s proper, and a provenance manifest records whichever file actually

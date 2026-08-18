@@ -39,6 +39,11 @@ _EXPORTS = {
     "generate_loci": "sglseti.generate",
     "materialize_epochs": "sglseti.generate",
     "GenerationError": "sglseti.errors",
+    "PlanningError": "sglseti.errors",
+    "plan_commensal": "sglseti.planning",
+    "VisibilityWindow": "sglseti.observability",
+    "find_windows": "sglseti.observability",
+    "visibility_sample": "sglseti.observability",
     "Role": "sglseti.models",
     "EndpointKind": "sglseti.models",
     "Validity": "sglseti.models",
@@ -95,6 +100,7 @@ if TYPE_CHECKING:
         EphemerisCoverageError,
         EphemerisError,
         GenerationError,
+        PlanningError,
         SglsetiError,
     )
     from .generate import generate_loci, materialize_epochs
@@ -133,6 +139,8 @@ if TYPE_CHECKING:
         Validity,
         VisibilitySample,
     )
+    from .observability import VisibilityWindow, find_windows, visibility_sample
+    from .planning import plan_commensal
     from .provenance import (
         build_manifest,
         canonical_json,

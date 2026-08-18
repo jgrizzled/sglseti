@@ -29,8 +29,9 @@ from sglseti.provenance import file_sha256
 KERNEL_PATH = REFERENCE_DIR.parent / "kernels" / "de440s_excerpt_2010-2035.bsp"
 
 # Pinned in tests/data/kernels/README.md; a change means the committed
-# fixture was modified and needs a documented reason.
-KERNEL_SHA256 = "sha256:eca51b9422e7d3d0266b271757f575671dca585cf4cd744a87cbf4870d5f7530"
+# fixture was modified and needs a documented reason (last: 2026-08-17,
+# Moon segment added for Phase 6 observability).
+KERNEL_SHA256 = "sha256:fcd8bc4ae5a3fe6abbb7033a12c581c2e71f737a3a2feb78375e66059697fee1"
 
 T_2021 = Time("2021-11-06T00:00:00", scale="utc")
 

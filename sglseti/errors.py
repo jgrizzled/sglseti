@@ -12,6 +12,7 @@ __all__ = [
     "EphemerisCoverageError",
     "EphemerisError",
     "GenerationError",
+    "PlanningError",
     "SglsetiError",
 ]
 
@@ -34,3 +35,7 @@ class EphemerisCoverageError(EphemerisError):
 
 class GenerationError(SglsetiError):
     """Raised when a batch calculation cannot proceed or fails strict mode."""
+
+
+class PlanningError(SglsetiError):
+    """Raised when commensal planning inputs are unusable."""

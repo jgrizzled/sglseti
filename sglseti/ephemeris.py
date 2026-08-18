@@ -64,6 +64,8 @@ class Ephemeris(Protocol):
 
     def earth_barycentric_au(self, time: Time) -> np.ndarray: ...
 
+    def moon_barycentric_au(self, time: Time) -> np.ndarray: ...
+
 
 class AstropyEphemeris:
     """Astropy-backed ephemeris: built-in analytic mode or a local JPL kernel.
@@ -111,6 +113,12 @@ class AstropyEphemeris:
     def earth_barycentric_au(self, time: Time) -> np.ndarray:
         return self._body_barycentric_au("earth", time)
 
+    def moon_barycentric_au(self, time: Time) -> np.ndarray:
+        # Needed only by observability (Moon-separation constraints); a
+        # kernel without a Moon segment fails here with a KeyError from
+        # jplephem, surfaced as an EphemerisError below.
+        return self._body_barycentric_au("moon", time)
+
     def _body_barycentric_au(self, body: str, time: Time) -> np.ndarray:
         import numpy as np
         from astropy import units as u
@@ -124,6 +132,11 @@ class AstropyEphemeris:
             raise EphemerisCoverageError(
                 f"epoch {time.isot} is outside the coverage of ephemeris "
                 f"{self._id}: {exc}"
+            ) from exc
+        except KeyError as exc:
+            raise EphemerisError(
+                f"ephemeris {self._id} has no segment for body {body!r}; "
+                "use a kernel that includes it (or the builtin adapter)"
             ) from exc
         result: np.ndarray = np.asarray(position.xyz.to_value(u.au), dtype=float)
         return result
