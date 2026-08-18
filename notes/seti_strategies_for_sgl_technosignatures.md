@@ -1,7 +1,7 @@
 ---
 title: "SETI Strategies for Stellar-Gravitational-Lens Technosignatures"
 date: 2026-08-17
-status: "Technical notes, draft v0.1"
+status: "Technical notes, draft v0.2"
 tags:
   - SETI
   - technosignatures
@@ -198,29 +198,79 @@ This approximation is adequate for exploratory plots. Precision scheduling shoul
 
 ### 3.2 Receive geometry
 
-For a receiving node, photons reaching the relay at local time \(t_R\) left the remote star roughly one interstellar light time earlier. The relevant incoming direction is tied to the star's **retarded position**.
+Two time conventions must be distinguished. Let:
 
-A practical solver should iterate:
+- \(t_o\) be the epoch at which a terrestrial observer receives light from the relay;
+- \(\rho\) be the relay–observer light-path length;
+- \(z\) be the relay–Sun light-path length;
+- \(d\) be the target–Sun light-path length; and
+- \(\mathbf{a}(u)\) be a Gaia-like catalog direction indexed by light-arrival epoch \(u\) at the Solar-System barycenter.
 
-1. guess the star-emission epoch;
-2. propagate the target star to that epoch;
-3. calculate travel time from star to the Solar lens;
-4. calculate travel time from the lens to the relay;
-5. update epochs until the ray, lens, and relay satisfy the alignment model.
+The relay event we observe occurs approximately at \(t_p=t_o-\rho/c\). For a receiving node, the interstellar signal passed the Solar lens one relay–Sun light time earlier, so
+
+\[
+t_{\ell,{\rm rx}}
+=t_o-(\rho+z)/c.
+\]
+
+The physical target emission represented by that wavefront occurred at
+
+\[
+t_{e,{\rm rx}}
+=t_o-(\rho+z+d)/c.
+\]
+
+These epochs belong to different propagation models. A physical-state solver evaluates \(\mathbf{r}_\star(t_{e,{\rm rx}})\). A Gaia/Astropy catalog solver evaluates the already-retarded astrometric direction at
+
+\[
+u_{\rm rx}=t_{\ell,{\rm rx}}
+=t_o-(\rho+z)/c.
+\]
+
+Under the Tusay et al. approximation \(\rho\simeq z\),
+
+\[
+u_{\rm rx}\simeq t_o-2z/c.
+\]
+
+The \(d/c\) term is implicit in the catalog direction and must not be subtracted again when using *SkyCoord.apply_space_motion()*. Doing so would double-retard the target.
 
 The local receive node lies on the extension behind the Sun opposite the remote star's retarded incoming direction.
 
 ### 3.3 Transmit geometry
 
-For a transmitting node, photons sent now must arrive at the target's **future position**. The solver should:
+For a transmitting node, the local signal passes the Solar lens at
 
-1. choose the relay emission epoch;
-2. propagate light from relay to the solar-limb interaction region;
-3. propagate from the Sun to the destination system;
-4. propagate the target star or destination terminal to the arrival epoch;
-5. solve for the outgoing axis and relay position.
+\[
+t_{\ell,{\rm tx}}
+=t_o+(z-\rho)/c
+\]
+
+and reaches the target's physical future position at
+
+\[
+t_{a,{\rm tx}}
+=t_o+(z-\rho+d)/c.
+\]
+
+A physical-state solver evaluates \(\mathbf{r}_\star(t_{a,{\rm tx}})\). To represent the same physical state with an arrival-indexed catalog direction, its epoch must satisfy \(u_{\rm tx}-d/c=t_{a,{\rm tx}}\), hence
+
+\[
+u_{\rm tx}
+=t_o+(z-\rho)/c+2d/c.
+\]
+
+With \(\rho\simeq z\), this becomes the Tusay et al. expression
+
+\[
+u_{\rm tx}\simeq t_o+2d/c.
+\]
+
+One \(d/c\) advances to physical signal arrival; the other converts that physical event time back to the arrival-time coordinate used by catalog astrometry.
 
 The Tx and Rx axes can differ substantially for high-proper-motion stars because one references a past state and the other a future state.
+
+The full derivation, assumptions, prototype assessment, and required diagnostics are recorded in [SGL Rx/Tx Light-Time Epoch Reconciliation](sgl_light_time_epoch_reconciliation.md). A future iterative physical-state solver should solve the light-time legs and moving Solar-System geometry consistently; it must not mix physical event epochs with arrival-indexed catalog epochs.
 
 ### 3.4 Point-ahead separation
 
