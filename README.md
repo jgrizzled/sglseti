@@ -68,6 +68,25 @@ result.write_ecsv("loci.ecsv")
 
 (API sketch from the PRD; names may be refined before v1.)
 
+## Ephemeris resources
+
+Calculations never touch the network. Astropy's built-in analytic ephemeris
+works out of the box for exploration; reproducible scientific products
+should pin the canonical kernel **JPL DE440s** (ADR-0002), fetched once with
+the only network-using command:
+
+```bash
+sglseti fetch ephemeris de440s --output-dir resources/
+# prints the verified sha256 and the request snippet:
+#   ephemeris:
+#     adapter: jpl_file
+#     path: resources/de440s.bsp
+```
+
+`sglseti fetch iers` optionally refreshes astropy's Earth-orientation
+tables (sub-arcsecond effect; never required). The `jpl_file` adapter needs
+the `jpl` extra: `uv sync --extra jpl` or `pip install 'sglseti[jpl]'`.
+
 ## Development
 
 ```bash

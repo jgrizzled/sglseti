@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Canonical ephemeris kernel and explicit fetch (ADR-0002): JPL DE440s
+  pinned by SHA-256 as the canonical kernel; a committed 1.16 MB DE440s
+  excerpt (Sun/EMB/Earth, 2010–2035) as the offline real-kernel regression
+  fixture; `sglseti fetch ephemeris|iers` as the only network-using
+  commands (atomic, checksum-verified downloads); `jpl` optional dependency
+  extra for `jplephem`.
 - Geometry core (Phase 4): `GeometryModel`/`Ephemeris` protocols, the
   reviewed `tusay2022_eq5_7_v1` model with SSB light-arrival catalog epochs,
   physical-event diagnostics, declared target-distance approximation, and

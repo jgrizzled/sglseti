@@ -80,6 +80,33 @@ def _cmd_samples(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_fetch_ephemeris(args: argparse.Namespace) -> int:
+    from .resources import fetch_kernel
+
+    result = fetch_kernel(
+        args.kernel,
+        args.output_dir,
+        url=args.url,
+        expected_sha256=args.expected_sha256,
+    )
+    print(f"fetched: {result.path}")
+    print(f"sha256:  {result.sha256}")
+    print(f"source:  {result.source_url}")
+    print("request snippet:")
+    print("  ephemeris:")
+    print("    adapter: jpl_file")
+    print(f"    path: {result.path}")
+    return 0
+
+
+def _cmd_fetch_iers(args: argparse.Namespace) -> int:
+    from .resources import refresh_iers
+
+    path = refresh_iers()
+    print(f"IERS-A table refreshed in astropy cache: {path}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="sglseti",
@@ -130,6 +157,40 @@ def build_parser() -> argparse.ArgumentParser:
     )
     samples.add_argument("--request", required=True, help="Path to the request YAML.")
     samples.set_defaults(func=_cmd_samples)
+
+    fetch = subcommands.add_parser(
+        "fetch",
+        help=(
+            "Explicitly download a pinned resource. The only sglseti command "
+            "that touches the network; calculations never download."
+        ),
+    )
+    fetch_kind = fetch.add_subparsers(dest="fetch_kind", required=True)
+
+    fetch_ephemeris = fetch_kind.add_parser(
+        "ephemeris", help="Download a JPL ephemeris kernel and verify its checksum."
+    )
+    fetch_ephemeris.add_argument(
+        "kernel",
+        nargs="?",
+        help="Known kernel name with a pinned checksum (e.g. de440s).",
+    )
+    fetch_ephemeris.add_argument(
+        "--url", help="Explicit kernel URL instead of a known kernel name."
+    )
+    fetch_ephemeris.add_argument(
+        "--expected-sha256",
+        help="Expected 'sha256:<hex>' checksum for --url downloads.",
+    )
+    fetch_ephemeris.add_argument(
+        "--output-dir", required=True, help="Directory to place the kernel in."
+    )
+    fetch_ephemeris.set_defaults(func=_cmd_fetch_ephemeris)
+
+    fetch_iers = fetch_kind.add_parser(
+        "iers", help="Refresh astropy's cached IERS-A Earth-orientation table."
+    )
+    fetch_iers.set_defaults(func=_cmd_fetch_iers)
 
     return parser
 

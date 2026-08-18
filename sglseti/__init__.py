@@ -30,6 +30,9 @@ _EXPORTS = {
     "EphemerisError": "sglseti.errors",
     "EphemerisCoverageError": "sglseti.errors",
     "AstropyEphemeris": "sglseti.ephemeris",
+    "KNOWN_KERNELS": "sglseti.resources",
+    "fetch_kernel": "sglseti.resources",
+    "refresh_iers": "sglseti.resources",
     "Tusay2022Eq57V1": "sglseti.geometry",
     "compute_relay_solution": "sglseti.geometry",
     "motion_rates": "sglseti.geometry",
@@ -133,6 +136,7 @@ if TYPE_CHECKING:
         stable_hash,
         stable_id,
     )
+    from .resources import KNOWN_KERNELS, fetch_kernel, refresh_iers
     from .sampling import generate_segments, segments_for_request
     from .targets import TargetRegistry, load_target_registry
 

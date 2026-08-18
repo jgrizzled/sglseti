@@ -123,6 +123,19 @@ wheels = [
 ]
 
 [[package]]
+name = "jplephem"
+version = "2.24"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "numpy", version = "2.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/90/8b/a50514f000fcd0207cd281370b0db66e7712a5db9f96b77a0301a7205f96/jplephem-2.24.tar.gz", hash = "sha256:354fe1adae022264ab46f18afb6af26211277cfd7b3ef90400755fcabe93bc11", size = 45289, upload-time = "2026-01-23T21:03:01.07Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9d/3f/b9d5739352badc11ca637c8f72525d519458622936bc3313ddefdc7dee96/jplephem-2.24-py3-none-any.whl", hash = "sha256:2de15608a0f13010a71a0a8af8765646d5884402006dac0dd7639d7db13629ac", size = 49585, upload-time = "2026-01-23T21:03:00.079Z" },
+]
+
+[[package]]
 name = "librt"
 version = "0.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -627,8 +640,14 @@ dependencies = [
     { name = "pyyaml" },
 ]
 
+[package.optional-dependencies]
+jpl = [
+    { name = "jplephem" },
+]
+
 [package.dev-dependencies]
 dev = [
+    { name = "jplephem" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "ruff" },
@@ -640,18 +659,22 @@ lint = [
     { name = "types-pyyaml" },
 ]
 test = [
+    { name = "jplephem" },
     { name = "pytest" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "astropy", specifier = ">=7.0,<9" },
+    { name = "jplephem", marker = "extra == 'jpl'", specifier = ">=2.21" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "pyyaml", specifier = ">=6.0" },
 ]
+provides-extras = ["jpl"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "jplephem", specifier = ">=2.21" },
     { name = "mypy", specifier = ">=1.11" },
     { name = "pytest", specifier = ">=8" },
     { name = "ruff", specifier = ">=0.6" },
@@ -662,7 +685,10 @@ lint = [
     { name = "ruff", specifier = ">=0.6" },
     { name = "types-pyyaml", specifier = ">=6.0" },
 ]
-test = [{ name = "pytest", specifier = ">=8" }]
+test = [
+    { name = "jplephem", specifier = ">=2.21" },
+    { name = "pytest", specifier = ">=8" },
+]
 
 [[package]]
 name = "types-pyyaml"
