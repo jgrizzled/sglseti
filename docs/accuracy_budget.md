@@ -32,7 +32,7 @@ fast/near extremes. Rule of thumb used below: a transverse displacement
 | Approximation | Scaling | Magnitude | Notes |
 |---|---|---|---|
 | Solar motion neglected during Sun–relay light travel | ≤ v☉/c, independent of z | **≤ ~11 mas** (measured solar barycentric speed ≤ 16 m/s) | Same physics class as the measured 9 mas light-time residual in the Horizons validation; the source paper's stated ~0.1 arcsec is a conservative bound |
-| ρ = z (observer–relay ≈ Sun–relay distance) | rx epoch error (ρ−z)/c ≤ ~500 s → μ·Δt | **≤ ~0.1 mas** even at Wolf 359 proper motion | Also drives the `observer_relay_light_time_days_approx` diagnostic |
+| ρ = z (observer–relay ≈ Sun–relay distance) | rx/tx omit the catalog-epoch correction (z−ρ)/c; \|z−ρ\|/c ≤ ~500 s → μ·Δt | **≤ ~0.1 mas** even at Wolf 359 proper motion | Relay-emission `−ρ/c` and relay-to-lens `+z/c` combine to this residual for tx; no full `z/c` term is missing. Also drives the `observer_relay_light_time_days_approx` diagnostic |
 | Constant target distance during propagation | δd = v_r·Δt → tx epoch error 2δd/c | sub-mas for all registry targets at ±75 yr | |
 | Linear stellar motion | see §3 (epoch span) | dominates the budget for binaries/accelerating targets | Removed by the richer provider families (§4) |
 | z > d/10 search prior | n/a — flagged, not an error | rows degrade with `outside_search_prior` | Study prior, not a physical bound |
@@ -41,7 +41,7 @@ fast/near extremes. Rule of thumb used below: a transverse displacement
 
 | Approximation | Scaling | Magnitude (Wolf 359, z = 665 AU) |
 |---|---|---|
-| Outbound aim-epoch retardation (~z/c) neglected | axis direction error μ·(z/c) | ~50 mas axis tilt → ~2×10⁻⁷ AU (~0.05 R☉) on b at s ≈ 1 AU |
+| Outbound observer-distance residual inherited from ρ = z | before the reduction, `u_tx = t_o + (z−ρ)/c + 2d/c`; v1 drops `(z−ρ)/c` | same ≤ ~0.1 mas bound above → ≤ ~5×10⁻¹⁰ AU (≤ ~1×10⁻⁷ R☉) on b at s ≈ 1 AU |
 | Closest-approach refinement tolerance | request `refine_tolerance_s` (default 60 s; 10 s in fixtures) | t_ca resolution only |
 | Transverse-speed finite difference | 1 h central step | diagnostic-only quantity |
 
@@ -119,8 +119,9 @@ and model approximation is ≥ 100× below requirement **except**:
    columns;
 4. catalog uncertainty over amplified tx spans — propagate it (§2.3).
 
-For milliarcsecond-class work, the declared model approximations
-(≤ ~11 mas solar-motion class, ~17 mas SPICE frame bias, ~50 mas outbound
-aim retardation at Wolf-like proper motions) become material; they are
-attached to model versions and await the §4.1 higher-fidelity family
+For milliarcsecond-class work, the ≤ ~11 mas solar-motion class and ~17 mas
+SPICE frame bias become material. The terrestrial outbound
+observer-distance residual remains ≤ ~0.1 mas even at Wolf-like proper
+motions, but should likewise be retained by a sub-mas model. These terms
+are attached to model versions and await the §4.1 higher-fidelity family
 (roadmap item 6.6) rather than silent fixes.

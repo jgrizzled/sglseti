@@ -34,6 +34,10 @@ propagation (ADR-0001) rather than invent a second astrometry path.
    observer at `t_o` is, physically, light arriving now, and arriving
    light travels along the apparent direction. `outbound` (relay→star
    downlink) uses the relay's aim direction `u = t_o + 2d/c` (`tx` role).
+   Before the `ρ ≈ z` reduction its observer-time relation is
+   `u = t_o + (z−ρ)/c + 2d/c`: relay emission at `t_o−ρ/c` followed by
+   `z/c` propagation to the Solar lens leaves only the local
+   `(z−ρ)/c` residual, not a separate full-`z/c` correction.
    Note the inbound epoch is *not* the `rx` role's `t_o − 2z/c`: that
    epoch indexes arrival at the relay, not at a ~1 AU observer.
 3. **Declared approximations**, all first-order small against the beam
@@ -42,9 +46,10 @@ propagation (ADR-0001) rather than invent a second astrometry path.
      (the relay lies on the axis by hypothesis; transmitter aim offsets
      move the beam *center* by the aiming error, which is part of the
      consumer's beam hypothesis, not this geometry);
-   - for `outbound`, the relay-emission retardation of the aim epoch
-     (`~z/c`, ≈3 d at 800 AU; direction effect `μ·z/c`, ≲0.1″ for
-     μ ≤ 10″/yr) is neglected — the same class as the model's `ρ = z`;
+   - for `outbound`, the model's `ρ = z` reduction drops the local
+     `(z−ρ)/c` term (≤ ~500 s for a terrestrial observer; direction effect
+     `μ·|z−ρ|/c`, ≤ ~0.2 mas for `μ ≤ 10″/yr`). The full relay-emission
+     delay is already paired with the relay-to-lens propagation above;
    - all `tusay2022_eq5_7_v1` approximation flags (linear stellar motion,
      constant target distance, neglected Solar motion) carry over. A
      direction error `δθ` displaces the axis at the observer by

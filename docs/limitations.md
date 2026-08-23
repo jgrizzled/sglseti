@@ -60,10 +60,12 @@ What sglseti v1 does **not** do, and where its numbers stop being trustworthy.
   SGL point-spread function, wavelength, transmitter aim and scan
   pattern, and receiver aperture — all outside the model. Beam radii in
   requests are assumed hypotheses; window durations are exact only for
-  those assumptions. The outbound axis additionally neglects the
-  relay-emission epoch retardation (~z/c; ~50 mas axis tilt at Wolf-359
-  proper motion, see the accuracy budget). Scan events themselves carry
-  `uncertainty_method = not_propagated`; use `crossing_uncertainty()` for
+  those assumptions. The outbound axis inherits the model's `ρ = z`
+  reduction: the unreduced observer-time epoch is
+  `u_tx = t_o + (z−ρ)/c + 2d/c`, so v1 drops only the local `(z−ρ)/c`
+  residual (≤ ~500 s and ≤ ~0.1 mas at Wolf-359 proper motion for a
+  terrestrial observer), not a full `z/c` delay. Scan events themselves
+  carry `uncertainty_method = not_propagated`; use `crossing_uncertainty()` for
   distributions on `b_min`, the crossing time, and side-of-axis
   stability — astrometric error displaces the axis by ~7×10⁻⁶ AU per
   arcsecond at 1 AU, which matters for sub-10⁻⁴ AU beam hypotheses.

@@ -69,6 +69,11 @@ With ρ≈z (an Earth observer and a relay hundreds of AU away), the rx epoch
 reduces to `t_o − 2z/c` and the tx epoch to `t_o + 2d/c` — the published
 equations 7 and 6.
 
+For tx, the relay-emission delay `−ρ/c` and the subsequent relay-to-lens
+flight `+z/c` combine to `(z−ρ)/c`. Under `ρ≈z` they cancel; subtracting a
+separate full `z/c` from the tx catalog epoch would double-count the
+relay-emission delay.
+
 **The cardinal rule:** the interstellar light time `d/c` belongs to the
 *physical* emission epoch only. It is already implicit in an arrival-indexed
 catalog direction. Passing the physical Rx emission epoch

@@ -16,9 +16,11 @@ axis:
   is arriving now, so the axis is the apparent state ``u = t_o``
   (``antipode`` role);
 - ``outbound`` (relay -> star downlink): the relay's aim direction
-  ``u = t_o + 2d/c`` (``tx`` role). The relay-emission retardation of the
-  epoch (``~z/c``) is neglected, a declared approximation of the same class
-  as the model's ``rho = z``.
+  ``u = t_o + 2d/c`` (``tx`` role). Before the model's ``rho = z``
+  reduction, the unreduced observer-time relation is
+  ``u = t_o + (z - rho)/c + 2d/c``: the relay-emission ``-rho/c`` and
+  relay-to-lens ``+z/c`` legs combine to the small local residual. No
+  separate full-``z/c`` target-epoch retardation is missing.
 
 The signed along-axis distance ``r . a`` distinguishes the post-lens target
 side from the anti-target side. Searching is deterministic and offline: a
