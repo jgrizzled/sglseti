@@ -78,19 +78,20 @@ gated or demand-driven (see the note).
 
 ## Installation
 
-Requires Python 3.11+. With [uv](https://docs.astral.sh/uv/):
+Requires Python 3.11+. Install from [PyPI](https://pypi.org/project/sglseti/):
 
 ```bash
-uv sync          # create the virtual environment and install dependencies
-uv run sglseti --help
-```
-
-Or with pip:
-
-```bash
-python -m pip install -e .
+pip install sglseti
 sglseti --help
 ```
+
+Or with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv pip install sglseti
+```
+
+To work from a source checkout instead, see [Development](#development).
 
 ## Usage
 
