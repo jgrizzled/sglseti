@@ -260,9 +260,7 @@ def minimize_impact_parameter(
     if coarse_samples < 3:
         raise GenerationError(f"coarse_samples must be at least 3, got {coarse_samples}")
     if refine_tolerance_s <= 0.0 or not math.isfinite(refine_tolerance_s):
-        raise GenerationError(
-            f"refine_tolerance_s must be positive, got {refine_tolerance_s}"
-        )
+        raise GenerationError(f"refine_tolerance_s must be positive, got {refine_tolerance_s}")
     start = interval.start.tdb
     span_days = float((interval.stop.tdb - start).jd)
 
@@ -346,9 +344,7 @@ def find_crossings(
             provider.provider_version,
             provider.content_hash,
         )
-    observer_state_provider = resolve_observer_state_provider(
-        request.observer, ephemeris
-    )
+    observer_state_provider = resolve_observer_state_provider(request.observer, ephemeris)
     observer_provider = (
         observer_state_provider.provider_id,
         observer_state_provider.provider_version,
@@ -511,9 +507,7 @@ def _scan_combination(
         minima.append((offsets[0], WARN_MINIMUM_AT_INTERVAL_START))
     for k in range(1, len(b) - 1):
         if b[k] < b[k - 1] and b[k] <= b[k + 1]:
-            refined = _golden_minimize(
-                b_at, offsets[k - 1], offsets[k + 1], tolerance_days
-            )
+            refined = _golden_minimize(b_at, offsets[k - 1], offsets[k + 1], tolerance_days)
             minima.append((refined, None))
     if len(b) >= 2 and b[-1] < b[-2]:
         minima.append((offsets[-1], WARN_MINIMUM_AT_INTERVAL_STOP))
@@ -521,10 +515,7 @@ def _scan_combination(
     events: list[CrossingEvent] = []
     for offset, truncation in minima:
         state = state_at(offset)
-        if (
-            request.report_max_b_au is not None
-            and state.b_au > request.report_max_b_au
-        ):
+        if request.report_max_b_au is not None and state.b_au > request.report_max_b_au:
             continue
         events.append(
             _build_event(
@@ -685,9 +676,7 @@ def _beam_windows(
         egress_time = start + TimeDelta(egress, format="jd", scale="tdb")
         windows.append(
             BeamWindow(
-                window_id=stable_id(
-                    "win", {"event_id": event_id, "beam_radius_au": radius}
-                ),
+                window_id=stable_id("win", {"event_id": event_id, "beam_radius_au": radius}),
                 event_id=event_id,
                 beam_radius_au=radius,
                 ingress_utc=str(ingress_time.utc.isot),

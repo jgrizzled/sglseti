@@ -97,8 +97,7 @@ def canonicalize(value: Any) -> Any:
                 elif item == field.default:
                     continue
             elif (
-                field.default_factory is not dataclasses.MISSING
-                and item == field.default_factory()
+                field.default_factory is not dataclasses.MISSING and item == field.default_factory()
             ):
                 continue
             fields[field.name] = canonicalize(item)
@@ -126,9 +125,7 @@ def canonicalize(value: Any) -> Any:
 
 
 def canonical_json(value: Any) -> str:
-    return json.dumps(
-        canonicalize(value), sort_keys=True, separators=(",", ":"), allow_nan=False
-    )
+    return json.dumps(canonicalize(value), sort_keys=True, separators=(",", ":"), allow_nan=False)
 
 
 def stable_hash(value: Any) -> str:

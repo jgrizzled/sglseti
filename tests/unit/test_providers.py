@@ -84,9 +84,7 @@ def test_resolvers_pick_the_baseline_families() -> None:
         resolve_observer_state_provider(Observer.earth_center(), EPHEMERIS),
         EarthCenterObserverV1,
     )
-    assert isinstance(
-        resolve_observer_state_provider(SITE, EPHEMERIS), TerrestrialSiteObserverV1
-    )
+    assert isinstance(resolve_observer_state_provider(SITE, EPHEMERIS), TerrestrialSiteObserverV1)
 
 
 def test_observer_providers_reject_mismatched_observer_kinds() -> None:
@@ -132,9 +130,7 @@ def test_linear_metadata_is_declared() -> None:
 
 
 def test_linear_missing_rv_is_a_solution_level_warning() -> None:
-    provider = LinearAstrometryV1(
-        make_target(radial_velocity_km_s=None, flags=(WARN_MISSING_RV,))
-    )
+    provider = LinearAstrometryV1(make_target(radial_velocity_km_s=None, flags=(WARN_MISSING_RV,)))
     assert WARN_MISSING_RV in provider.warnings
     state = provider.state_at(T_O.tdb)
     assert np.isfinite(state.ra_deg) and np.isfinite(state.dec_deg)
@@ -158,9 +154,7 @@ def test_linear_propagation_span_years() -> None:
 def test_earth_center_state_matches_ephemeris_earth() -> None:
     provider = EarthCenterObserverV1(Observer.earth_center(), EPHEMERIS)
     state = provider.state_at(T_O)
-    assert np.array_equal(
-        np.asarray(state.position_au), EPHEMERIS.earth_barycentric_au(T_O)
-    )
+    assert np.array_equal(np.asarray(state.position_au), EPHEMERIS.earth_barycentric_au(T_O))
     assert state.velocity_au_per_day is None
     # And the geometry-level helper is the provider path.
     assert np.array_equal(
@@ -173,9 +167,7 @@ def test_site_state_offset_is_geocentric_radius() -> None:
     provider = TerrestrialSiteObserverV1(SITE, EPHEMERIS)
     state = provider.state_at(T_O)
     earth = EPHEMERIS.earth_barycentric_au(T_O)
-    offset_km = float(
-        np.linalg.norm(np.asarray(state.position_au) - earth)
-    ) * 149_597_870.7
+    offset_km = float(np.linalg.norm(np.asarray(state.position_au) - earth)) * 149_597_870.7
     assert 6350.0 < offset_km < 6390.0  # geocentric radius at latitude 38.4
     assert np.array_equal(
         observer_barycentric_au(SITE, T_O, EPHEMERIS), np.asarray(state.position_au)
@@ -197,10 +189,7 @@ def test_observer_metadata_is_declared() -> None:
     assert earth.content_hash != site.content_hash
     # Identity covers the ephemeris and, for a site, its geodetic position.
     other_site = Observer.from_geodetic("gbt2", -79.83983611, 38.5, 807.43)
-    assert (
-        TerrestrialSiteObserverV1(other_site, EPHEMERIS).content_hash
-        != site.content_hash
-    )
+    assert TerrestrialSiteObserverV1(other_site, EPHEMERIS).content_hash != site.content_hash
 
 
 def test_model_rejects_foreign_epoch_semantics(
@@ -217,9 +206,7 @@ def test_model_rejects_foreign_epoch_semantics(
         lambda target: PhysicalEpochProvider(target),
     )
     with pytest.raises(ValueError, match="epoch\\s+semantics"):
-        Tusay2022Eq57V1().target_direction(
-            make_target(), T_O, 1000.0, Role.ANTIPODE, EPHEMERIS
-        )
+        Tusay2022Eq57V1().target_direction(make_target(), T_O, 1000.0, Role.ANTIPODE, EPHEMERIS)
 
 
 def test_model_output_unchanged_through_provider_path() -> None:
@@ -237,9 +224,7 @@ def test_model_output_unchanged_through_provider_path() -> None:
 # ---------------------------------------------------------------------------
 
 
-def make_accel_target(
-    accel_ra: float = 0.9, accel_dec: float = -0.4
-) -> Target:
+def make_accel_target(accel_ra: float = 0.9, accel_dec: float = -0.4) -> Target:
     base = make_target()
     return Target(
         target_id="unit-accel",
@@ -360,14 +345,10 @@ def test_circular_faceon_orbit_has_constant_separation() -> None:
     from astropy import units as u
 
     primary = TwoBodyOrbitV1(
-        make_orbit_target(
-            OrbitComponent.PRIMARY, eccentricity=0.0, inclination_deg=0.0
-        )
+        make_orbit_target(OrbitComponent.PRIMARY, eccentricity=0.0, inclination_deg=0.0)
     )
     secondary = TwoBodyOrbitV1(
-        make_orbit_target(
-            OrbitComponent.SECONDARY, eccentricity=0.0, inclination_deg=0.0
-        )
+        make_orbit_target(OrbitComponent.SECONDARY, eccentricity=0.0, inclination_deg=0.0)
     )
     for epoch_jyear in (1990.0, 2003.7, 2017.2, 2042.9):
         epoch = Time(epoch_jyear, format="jyear", scale="tdb")

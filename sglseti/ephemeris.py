@@ -52,6 +52,12 @@ def offline_resources(iers_table: Any | None = None) -> Iterator[None]:
     Inside the context, IERS auto-download is disabled and degraded
     Earth-orientation accuracy is forced to warn (never raise, never pass
     silently) so callers can capture the warnings into product validity.
+    The table-age limit (``auto_max_age``) is lifted as well: with downloads
+    off, astropy would otherwise raise outright for any epoch past the
+    bundled table's predictive range once that table is more than 30 days
+    old — turning every offline install into a time bomb. Coverage
+    degradation still surfaces through the transform warnings captured
+    above.
     When ``iers_table`` is given (an :class:`IersResource` table), it is
     installed explicitly via astropy's ``earth_orientation_table`` context —
     the pinned file is *used*, not merely cached; otherwise astropy's
@@ -62,6 +68,7 @@ def offline_resources(iers_table: Any | None = None) -> Iterator[None]:
 
     with contextlib.ExitStack() as stack:
         stack.enter_context(iers.conf.set_temp("auto_download", False))
+        stack.enter_context(iers.conf.set_temp("auto_max_age", None))
         stack.enter_context(iers.conf.set_temp("iers_degraded_accuracy", "warn"))
         if iers_table is not None:
             stack.enter_context(iers.earth_orientation_table.set(iers_table))
@@ -112,9 +119,7 @@ class IersResource:
         except EphemerisError:
             raise
         except Exception as exc:
-            raise EphemerisError(
-                f"failed to parse IERS-A table {path.name}: {exc}"
-            ) from exc
+            raise EphemerisError(f"failed to parse IERS-A table {path.name}: {exc}") from exc
         self._id = f"iers_a:{checksum}"
 
     @property
@@ -178,13 +183,10 @@ class AstropyEphemeris:
                 import jplephem  # noqa: F401
             except ImportError as exc:
                 raise EphemerisError(
-                    "the jpl_file ephemeris adapter requires the optional "
-                    "'jplephem' dependency"
+                    "the jpl_file ephemeris adapter requires the optional 'jplephem' dependency"
                 ) from exc
             checksum = file_sha256(path)
-            if self.spec.checksum_sha256 is not None and (
-                self.spec.checksum_sha256 != checksum
-            ):
+            if self.spec.checksum_sha256 is not None and (self.spec.checksum_sha256 != checksum):
                 raise EphemerisError(
                     f"ephemeris kernel checksum mismatch for {path.name}: "
                     f"expected {self.spec.checksum_sha256}, got {checksum}"
@@ -248,8 +250,7 @@ class AstropyEphemeris:
         except ValueError as exc:
             # jplephem signals out-of-range epochs with ValueError.
             raise EphemerisCoverageError(
-                f"epoch {time.isot} is outside the coverage of ephemeris "
-                f"{self._id}: {exc}"
+                f"epoch {time.isot} is outside the coverage of ephemeris {self._id}: {exc}"
             ) from exc
         except KeyError as exc:
             raise EphemerisError(

@@ -314,9 +314,7 @@ def load_target_registry(
             fail("targets", f"target keys must be non-empty strings, got {target_id!r}")
         ctx = f"targets.{target_id}"
         block = _mapping(raw, ctx, fail)
-        targets.append(
-            _parse_target(target_id, block, ctx, fail, missing_radial_velocity)
-        )
+        targets.append(_parse_target(target_id, block, ctx, fail, missing_radial_velocity))
 
     return TargetRegistry.from_targets(tuple(targets))
 
@@ -343,9 +341,7 @@ def _parse_target(
     astro_ctx = f"{state_ctx}.astrometry"
     astro = _mapping(state_block.get("astrometry"), astro_ctx, fail)
     flags = _parse_str_tuple(block.get("flags", []), f"{ctx}.flags", fail)
-    astrometry, flags = _parse_astrometry(
-        astro, astro_ctx, fail, missing_radial_velocity, flags
-    )
+    astrometry, flags = _parse_astrometry(astro, astro_ctx, fail, missing_radial_velocity, flags)
 
     acceleration: AccelerationTerms | None = None
     if "acceleration" in state_block:
@@ -387,13 +383,9 @@ def _parse_target(
             fail,
             OrbitSolution,
             period_yr=_number(orbit_block, "period_yr", orbit_ctx, fail),
-            periastron_epoch_jyear=_number(
-                orbit_block, "periastron_epoch_jyear", orbit_ctx, fail
-            ),
+            periastron_epoch_jyear=_number(orbit_block, "periastron_epoch_jyear", orbit_ctx, fail),
             eccentricity=_number(orbit_block, "eccentricity", orbit_ctx, fail),
-            semimajor_axis_arcsec=_number(
-                orbit_block, "semimajor_axis_arcsec", orbit_ctx, fail
-            ),
+            semimajor_axis_arcsec=_number(orbit_block, "semimajor_axis_arcsec", orbit_ctx, fail),
             inclination_deg=_number(orbit_block, "inclination_deg", orbit_ctx, fail),
             ascending_node_deg=_number(orbit_block, "ascending_node_deg", orbit_ctx, fail),
             arg_periastron_deg=_number(orbit_block, "arg_periastron_deg", orbit_ctx, fail),
@@ -473,12 +465,8 @@ def _parse_astrometry(
         if not isinstance(astro.get(required), str) or not str(astro[required]).strip():
             fail(f"{astro_ctx}.{required}", "is required and must be a non-empty string")
 
-    parallax = (
-        _number(astro, "parallax_mas", astro_ctx, fail) if "parallax_mas" in astro else None
-    )
-    distance = (
-        _number(astro, "distance_pc", astro_ctx, fail) if "distance_pc" in astro else None
-    )
+    parallax = _number(astro, "parallax_mas", astro_ctx, fail) if "parallax_mas" in astro else None
+    distance = _number(astro, "distance_pc", astro_ctx, fail) if "distance_pc" in astro else None
 
     radial_velocity: float | None
     if "radial_velocity_km_s" in astro:
@@ -564,9 +552,7 @@ def _parse_provenance(
         entry = _mapping(entry_raw, entry_ctx, fail)
         _check_keys(entry, _PROVENANCE_ENTRY_KEYS, entry_ctx, fail)
         uncertainty = (
-            _number(entry, "uncertainty", entry_ctx, fail)
-            if "uncertainty" in entry
-            else None
+            _number(entry, "uncertainty", entry_ctx, fail) if "uncertainty" in entry else None
         )
         unit = _string(entry, "unit", entry_ctx, fail) if "unit" in entry else None
         entries.append(
@@ -583,9 +569,7 @@ def _parse_provenance(
     return tuple(sorted(entries, key=lambda e: e.parameter))
 
 
-def _parse_covariance(
-    state_block: dict[str, Any], ctx: str, fail: _Fail
-) -> CovarianceSpec | None:
+def _parse_covariance(state_block: dict[str, Any], ctx: str, fail: _Fail) -> CovarianceSpec | None:
     if "covariance" not in state_block:
         return None
     raw = _mapping(state_block.get("covariance"), ctx, fail)
@@ -601,9 +585,7 @@ def _parse_covariance(
             f"unknown kind {kind_raw!r}; choose from {[k.value for k in CovarianceKind]}",
         )
     matrix_raw = raw.get("matrix")
-    if not isinstance(matrix_raw, list) or not all(
-        isinstance(row, list) for row in matrix_raw
-    ):
+    if not isinstance(matrix_raw, list) or not all(isinstance(row, list) for row in matrix_raw):
         fail(f"{ctx}.matrix", "must be a list of rows (lists of numbers)")
     matrix: list[tuple[float, ...]] = []
     for i, row in enumerate(matrix_raw):

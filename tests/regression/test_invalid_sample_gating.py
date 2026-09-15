@@ -53,17 +53,11 @@ def planned():
 
 @pytest.fixture(scope="module")
 def outside_prior_ids(planned) -> set[str]:
-    return {
-        s.sample_id
-        for s in planned.samples
-        if WARN_OUTSIDE_SEARCH_PRIOR in s.warnings
-    }
+    return {s.sample_id for s in planned.samples if WARN_OUTSIDE_SEARCH_PRIOR in s.warnings}
 
 
 def test_beyond_prior_samples_are_degraded_and_operational(planned) -> None:
-    flagged = [
-        s for s in planned.samples if WARN_OUTSIDE_SEARCH_PRIOR in s.warnings
-    ]
+    flagged = [s for s in planned.samples if WARN_OUTSIDE_SEARCH_PRIOR in s.warnings]
     assert flagged  # the beyond-bound segment of each corridor
     for sample in flagged:
         assert sample.z_au > Z_PRIOR_BOUND_AU
@@ -78,13 +72,9 @@ def test_no_sample_is_invalid_for_a_mere_prior_violation(planned) -> None:
     assert not any(s.validity is Validity.INVALID for s in planned.samples)
 
 
-def test_pointings_using_prior_violating_samples_carry_the_code(
-    planned, outside_prior_ids
-) -> None:
+def test_pointings_using_prior_violating_samples_carry_the_code(planned, outside_prior_ids) -> None:
     assert planned.pointings
-    flagged_pointings = [
-        p for p in planned.pointings if outside_prior_ids & set(p.sample_ids)
-    ]
+    flagged_pointings = [p for p in planned.pointings if outside_prior_ids & set(p.sample_ids)]
     assert flagged_pointings  # the samples are consumable, visibly
     for pointing in flagged_pointings:
         assert WARN_OUTSIDE_SEARCH_PRIOR in pointing.warnings
@@ -124,23 +114,15 @@ def test_invalid_rows_stay_out_of_products_but_in_tables(tmp_path: Path) -> None
     invalid = [s for s in result.samples if s.validity is Validity.INVALID]
     assert invalid
     assert all(not s.is_operational for s in invalid)
-    written = write_products(
-        result, tmp_path, generated_utc="2026-08-17T12:00:00+00:00"
-    )
-    assert "invalid sample(s) omitted" in written["regions_ds9"].read_text(
-        encoding="utf-8"
-    )
+    written = write_products(result, tmp_path, generated_utc="2026-08-17T12:00:00+00:00")
+    assert "invalid sample(s) omitted" in written["regions_ds9"].read_text(encoding="utf-8")
     document = json.loads(written["result_json"].read_text(encoding="utf-8"))
     rows = [s for s in document["samples"] if s["validity"] == "invalid"]
     assert len(rows) == len(invalid)
 
 
-def test_degraded_prior_rows_are_present_in_ds9(
-    planned, outside_prior_ids, tmp_path: Path
-) -> None:
-    written = write_products(
-        planned, tmp_path, generated_utc="2026-08-17T12:00:00+00:00"
-    )
+def test_degraded_prior_rows_are_present_in_ds9(planned, outside_prior_ids, tmp_path: Path) -> None:
+    written = write_products(planned, tmp_path, generated_utc="2026-08-17T12:00:00+00:00")
     ds9 = written["regions_ds9"].read_text(encoding="utf-8")
     for sample_id in outside_prior_ids:
         assert sample_id in ds9  # consumable, so exported

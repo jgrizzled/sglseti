@@ -57,9 +57,7 @@ from sglseti.uncertainty import crossing_uncertainty
 pytest.importorskip("jplephem")
 
 FIXTURE = load_reference_fixture("wolf359_crossing_reference.yaml")
-KERNEL = Path(__file__).resolve().parents[1] / "data" / "kernels" / (
-    "de440s_excerpt_2010-2035.bsp"
-)
+KERNEL = Path(__file__).resolve().parents[1] / "data" / "kernels" / ("de440s_excerpt_2010-2035.bsp")
 
 
 def wolf359_target(with_uncertainty: bool = False) -> Target:
@@ -93,9 +91,7 @@ def wolf359_target(with_uncertainty: bool = False) -> Target:
 
 @pytest.fixture(scope="module")
 def kernel_ephemeris() -> AstropyEphemeris:
-    return AstropyEphemeris(
-        EphemerisSpec(adapter=EphemerisAdapter.JPL_FILE, path=str(KERNEL))
-    )
+    return AstropyEphemeris(EphemerisSpec(adapter=EphemerisAdapter.JPL_FILE, path=str(KERNEL)))
 
 
 def spacecraft_table(
@@ -111,9 +107,8 @@ def spacecraft_table(
     for day in range(76):  # through 2015-10-08
         time = start + TimeDelta(float(day), format="jd", scale="tdb")
         earth = ephemeris.earth_barycentric_au(time)
-        velocity = (
-            ephemeris.earth_barycentric_au(time + half_day)
-            - ephemeris.earth_barycentric_au(time - half_day)
+        velocity = ephemeris.earth_barycentric_au(time + half_day) - ephemeris.earth_barycentric_au(
+            time - half_day
         )  # AU/day, central difference
         epochs_jd.append(float(time.tdb.jd))
         positions.append(earth + displacement_au)
@@ -130,9 +125,7 @@ def spacecraft_table(
             "vz_au_per_day": [v[2] for v in velocities],
         }
     ).write(path, format="ascii.ecsv", overwrite=True)
-    return Observer.spacecraft_table(
-        name, str(path), checksum_sha256=file_sha256(path)
-    )
+    return Observer.spacecraft_table(name, str(path), checksum_sha256=file_sha256(path))
 
 
 def crossing_request(observer: Observer) -> CrossingsRequest:
@@ -151,9 +144,7 @@ def crossing_request(observer: Observer) -> CrossingsRequest:
         model_id="tusay2022_eq5_7_v1",
         coarse_step_days=5.0,
         refine_tolerance_s=10.0,
-        ephemeris=EphemerisSpec(
-            adapter=EphemerisAdapter.JPL_FILE, path=str(KERNEL)
-        ),
+        ephemeris=EphemerisSpec(adapter=EphemerisAdapter.JPL_FILE, path=str(KERNEL)),
     )
 
 
@@ -174,16 +165,12 @@ def earth_event():
 def _axis_unit(event) -> np.ndarray:
     ra = math.radians(event.axis_icrs_ra_deg)
     dec = math.radians(event.axis_icrs_dec_deg)
-    return np.array(
-        [math.cos(dec) * math.cos(ra), math.cos(dec) * math.sin(ra), math.sin(dec)]
-    )
+    return np.array([math.cos(dec) * math.cos(ra), math.cos(dec) * math.sin(ra), math.sin(dec)])
 
 
 def test_earth_baseline_matches_frozen_fixture(earth_event) -> None:
     frozen = FIXTURE["years"][2015]
-    assert earth_event.b_min_solar_radii == pytest.approx(
-        frozen["computed_b_min_rsun"], abs=5e-3
-    )
+    assert earth_event.b_min_solar_radii == pytest.approx(frozen["computed_b_min_rsun"], abs=5e-3)
     assert earth_event.observer_provider_id == "earth_center_v1"
 
 
@@ -206,9 +193,7 @@ def test_cross_axis_displacement_shifts_the_crossing_by_its_magnitude(
     perpendicular = np.cross(axis, [0.0, 0.0, 1.0])
     perpendicular /= np.linalg.norm(perpendicular)
     magnitude = 0.002  # AU, smaller than b_min (~0.0035 AU): no side flip
-    observer = spacecraft_table(
-        tmp_path, "cross-axis", kernel_ephemeris, magnitude * perpendicular
-    )
+    observer = spacecraft_table(tmp_path, "cross-axis", kernel_ephemeris, magnitude * perpendicular)
     event = deepest_event(observer)
     delta_b = event.b_min_au - earth_event.b_min_au
     delta_t_days = event.t_ca_tdb_jd - earth_event.t_ca_tdb_jd
@@ -250,11 +235,7 @@ def test_uncertainty_and_interval_products_compose_with_spacecraft(
     )
     assert uncertainty.sample_count == 12
     assert uncertainty.b_min_sigma_au >= 0.0
-    assert (
-        uncertainty.b_min_lower_au
-        <= uncertainty.b_min_median_au
-        <= uncertainty.b_min_upper_au
-    )
+    assert uncertainty.b_min_lower_au <= uncertainty.b_min_median_au <= uncertainty.b_min_upper_au
     assert uncertainty.side_consistency_fraction == 1.0
 
     exposure = ObservationInterval(
@@ -281,9 +262,7 @@ def test_impact_parameter_point_query_consistency(
     from sglseti.crossings import impact_parameter
 
     axis = _axis_unit(earth_event)
-    observer = spacecraft_table(
-        tmp_path, "point-query", kernel_ephemeris, 0.002 * axis
-    )
+    observer = spacecraft_table(tmp_path, "point-query", kernel_ephemeris, 0.002 * axis)
     event = deepest_event(observer)
     sample = impact_parameter(
         target=wolf359_target(),

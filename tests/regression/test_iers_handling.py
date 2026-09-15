@@ -53,10 +53,47 @@ def _bundled_iers_a_path() -> str:
 
 def _epoch_2050() -> TimeList:
     return TimeList(
-        epochs=(
-            Epoch(epoch_id="e2050", time=Time("2050-06-01T00:00:00", scale="utc")),
-        )
+        epochs=(Epoch(epoch_id="e2050", time=Time("2050-06-01T00:00:00", scale="utc")),)
     )
+
+
+class TestOfflinePolicy:
+    def test_offline_resources_lifts_table_age_limit(self) -> None:
+        # With auto-download off, astropy's ``auto_max_age`` check raises
+        # (not warns) for epochs beyond the bundled table's predictive range
+        # once the table is >30 days old — which every offline install
+        # eventually is. The policy must lift it so staleness degrades
+        # samples via captured warnings instead of crashing.
+        from astropy.utils import iers
+
+        with offline_resources():
+            assert iers.conf.auto_download is False
+            assert iers.conf.auto_max_age is None
+            assert iers.conf.iers_degraded_accuracy == "warn"
+
+    def test_stale_bundled_table_degrades_instead_of_raising(self) -> None:
+        # Simulate a table far past its shelf life regardless of the real
+        # bundled data's age.
+        from astropy.utils import iers
+
+        table = iers.IERS_Auto.open()
+        original = table.meta["predictive_mjd"]
+        table.meta["predictive_mjd"] = original - 10_000.0
+        try:
+            visibility = visibility_sample(
+                sample=make_locus_sample(observation_time_utc="2050-06-01T00:00:00.000"),
+                epoch=Epoch(epoch_id="e2050", time=Time("2050-06-01T00:00:00", scale="utc")),
+                observer=Observer.from_geodetic("test-site", -111.6003, 31.9583, 2096.0),
+                ephemeris=FakeEphemeris((0.004, -0.002, 0.001), (0.558, -0.744, -0.323)),
+                constraints=ObservabilityConstraints(
+                    min_target_altitude_deg=-90.0,
+                    max_sun_altitude_deg=90.0,
+                    min_moon_separation_deg=0.0,
+                ),
+            )
+        finally:
+            table.meta["predictive_mjd"] = original
+        assert any(code.startswith("astropy:") for code in visibility.warnings)
 
 
 class TestDegradationCapture:
@@ -93,12 +130,8 @@ class TestDegradationCapture:
 
     def test_visibility_sample_carries_iers_warnings(self) -> None:
         visibility = visibility_sample(
-            sample=make_locus_sample(
-                observation_time_utc="2050-06-01T00:00:00.000"
-            ),
-            epoch=Epoch(
-                epoch_id="e2050", time=Time("2050-06-01T00:00:00", scale="utc")
-            ),
+            sample=make_locus_sample(observation_time_utc="2050-06-01T00:00:00.000"),
+            epoch=Epoch(epoch_id="e2050", time=Time("2050-06-01T00:00:00", scale="utc")),
             observer=Observer.from_geodetic("test-site", -111.6003, 31.9583, 2096.0),
             ephemeris=FakeEphemeris((0.004, -0.002, 0.001), (0.558, -0.744, -0.323)),
             constraints=ObservabilityConstraints(

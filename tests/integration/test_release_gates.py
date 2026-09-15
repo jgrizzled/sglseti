@@ -17,9 +17,7 @@ from pathlib import Path
 from support import EXAMPLES_DIR
 
 PACKAGE_DIR = Path(__file__).resolve().parents[2] / "sglseti"
-KERNEL = Path(__file__).resolve().parents[1] / "data" / "kernels" / (
-    "de440s_excerpt_2010-2035.bsp"
-)
+KERNEL = Path(__file__).resolve().parents[1] / "data" / "kernels" / ("de440s_excerpt_2010-2035.bsp")
 
 _NETWORK_BLOCK = """
 import sys

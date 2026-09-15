@@ -93,12 +93,8 @@ def build_result(**request_overrides: object):
 
 
 def test_products_round_trip(tmp_path: Path) -> None:
-    result = build_result(
-        output_formats=(OutputFormat.ECSV, OutputFormat.JSON, OutputFormat.CSV)
-    )
-    written = write_crossings_products(
-        result, tmp_path, generated_utc="2026-08-18T00:00:00+00:00"
-    )
+    result = build_result(output_formats=(OutputFormat.ECSV, OutputFormat.JSON, OutputFormat.CSV))
+    written = write_crossings_products(result, tmp_path, generated_utc="2026-08-18T00:00:00+00:00")
     assert set(written) == {
         "events_ecsv",
         "windows_ecsv",
@@ -116,10 +112,7 @@ def test_products_round_trip(tmp_path: Path) -> None:
     assert events["b_min_au"].unit == "AU"
     assert events["v_perp_km_s"].unit == "km / s"
     assert events.meta["crossings_id"] == result.crossings_id
-    assert (
-        events.meta["crossings_result_schema_version"]
-        == CROSSINGS_RESULT_SCHEMA_VERSION
-    )
+    assert events.meta["crossings_result_schema_version"] == CROSSINGS_RESULT_SCHEMA_VERSION
 
     windows = Table.read(written["windows_ecsv"])
     assert tuple(windows.colnames) == EXPECTED_WINDOW_COLUMNS
@@ -171,9 +164,7 @@ def test_invalid_status_row_exports(tmp_path: Path) -> None:
         registry,
         ephemeris=CircularOrbitEphemeris(coverage_jd=(JD0, JD0 + 100.0)),
     )
-    written = write_crossings_products(
-        result, tmp_path, generated_utc="2026-08-18T00:00:00+00:00"
-    )
+    written = write_crossings_products(result, tmp_path, generated_utc="2026-08-18T00:00:00+00:00")
     document = json.loads(written["result_json"].read_text(encoding="utf-8"))
     (event,) = document["events"]
     # NaN geometry becomes null; the unknown side is null, never a label.

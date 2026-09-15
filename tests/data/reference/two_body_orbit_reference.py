@@ -96,9 +96,7 @@ def kepler_bisect(mean_anomaly: float, eccentricity: float) -> float:
     return 0.5 * (low + high)
 
 
-def thiele_innes_offset(
-    elements: dict[str, float], epoch_jyear: float
-) -> tuple[float, float]:
+def thiele_innes_offset(elements: dict[str, float], epoch_jyear: float) -> tuple[float, float]:
     """(north, east) offset of the secondary from the primary, arcsec.
 
     Thiele-Innes formulation: x = AX + FY (north), y = BX + GY (east) with

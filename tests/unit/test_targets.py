@@ -100,9 +100,7 @@ def test_non_finite_or_non_numeric_values(tmp_path: Path, bad_value: object) -> 
         ("reference_epoch_jyear", 1500.0, r"\[1800, 2200\]"),
     ],
 )
-def test_out_of_range_astrometry(
-    tmp_path: Path, field: str, value: float, pattern: str
-) -> None:
+def test_out_of_range_astrometry(tmp_path: Path, field: str, value: float, pattern: str) -> None:
     astrometry = dict(VALID_ASTROMETRY, **{field: value})
     with pytest.raises(ConfigError, match=pattern):
         load_target_registry(make_registry_yaml(tmp_path, astrometry))

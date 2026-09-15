@@ -58,11 +58,7 @@ def test_documented_output_order(result_and_request) -> None:
     result, request, _ = result_and_request
     assert isinstance(request.time, TimeList)
     epoch_order = [epoch.epoch_id for epoch in request.time.epochs]
-    expected_keys = [
-        (role, epoch_id)
-        for role in (Role.RX, Role.TX)
-        for epoch_id in epoch_order
-    ]
+    expected_keys = [(role, epoch_id) for role in (Role.RX, Role.TX) for epoch_id in epoch_order]
     seen_keys = []
     for sample in result.samples:
         key = (sample.role, sample.epoch_id)

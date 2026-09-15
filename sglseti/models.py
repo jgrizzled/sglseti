@@ -124,9 +124,7 @@ PROVIDER_ENDPOINT_KINDS = {
 #: geometry model consumes only arrival-indexed states; declaring
 #: ``physical_event_time`` documents a table the model will explicitly
 #: refuse rather than silently misinterpret.
-SUPPORTED_SAMPLED_EPOCH_SEMANTICS = frozenset(
-    {"ssb_light_arrival_time", "physical_event_time"}
-)
+SUPPORTED_SAMPLED_EPOCH_SEMANTICS = frozenset({"ssb_light_arrival_time", "physical_event_time"})
 
 _ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 _EPOCH_ID_PATTERN = re.compile(r"^\S+$")
@@ -378,13 +376,10 @@ class ParameterProvenance:
             _require_finite(f"uncertainty for {self.parameter}", self.uncertainty)
             if self.uncertainty <= 0.0:
                 raise ValueError(
-                    f"uncertainty for {self.parameter} must be positive, "
-                    f"got {self.uncertainty}"
+                    f"uncertainty for {self.parameter} must be positive, got {self.uncertainty}"
                 )
             if not self.unit or not self.unit.strip():
-                raise ValueError(
-                    f"uncertainty for {self.parameter} requires an explicit unit"
-                )
+                raise ValueError(f"uncertainty for {self.parameter} requires an explicit unit")
 
 
 @dataclass(frozen=True)
@@ -410,18 +405,14 @@ class CovarianceSpec:
         if any(not p or not p.strip() for p in self.parameters):
             raise ValueError("covariance parameters must be non-empty strings")
         if len(self.units) != n:
-            raise ValueError(
-                f"covariance declares {n} parameters but {len(self.units)} units"
-            )
+            raise ValueError(f"covariance declares {n} parameters but {len(self.units)} units")
         if any(not isinstance(unit, str) or not unit.strip() for unit in self.units):
             raise ValueError("covariance units must be non-empty strings")
         if len(self.matrix) != n:
             raise ValueError(f"covariance matrix must have {n} rows, got {len(self.matrix)}")
         for i, row in enumerate(self.matrix):
             if len(row) != n:
-                raise ValueError(
-                    f"covariance matrix row {i} must have {n} entries, got {len(row)}"
-                )
+                raise ValueError(f"covariance matrix row {i} must have {n} entries, got {len(row)}")
             for j, value in enumerate(row):
                 _require_finite(f"covariance matrix[{i}][{j}]", value)
         for i in range(n):
@@ -441,8 +432,7 @@ class CovarianceSpec:
                     )
             elif diagonal <= 0.0:
                 raise ValueError(
-                    f"covariance matrix diagonal must be positive, "
-                    f"got {diagonal} at [{i}][{i}]"
+                    f"covariance matrix diagonal must be positive, got {diagonal} at [{i}][{i}]"
                 )
         if self.kind is CovarianceKind.CORRELATION:
             for i in range(n):
@@ -508,20 +498,15 @@ class OrbitSolution:
             )
         _require_finite("eccentricity", self.eccentricity)
         if not 0.0 <= self.eccentricity < 1.0:
-            raise ValueError(
-                f"eccentricity must be within [0, 1), got {self.eccentricity}"
-            )
+            raise ValueError(f"eccentricity must be within [0, 1), got {self.eccentricity}")
         _require_finite("semimajor_axis_arcsec", self.semimajor_axis_arcsec)
         if self.semimajor_axis_arcsec <= 0.0:
             raise ValueError(
-                f"semimajor_axis_arcsec must be positive, "
-                f"got {self.semimajor_axis_arcsec}"
+                f"semimajor_axis_arcsec must be positive, got {self.semimajor_axis_arcsec}"
             )
         _require_finite("inclination_deg", self.inclination_deg)
         if not 0.0 <= self.inclination_deg <= 180.0:
-            raise ValueError(
-                f"inclination_deg must be within [0, 180], got {self.inclination_deg}"
-            )
+            raise ValueError(f"inclination_deg must be within [0, 180], got {self.inclination_deg}")
         for name, value in (
             ("ascending_node_deg", self.ascending_node_deg),
             ("arg_periastron_deg", self.arg_periastron_deg),
@@ -532,8 +517,7 @@ class OrbitSolution:
         _require_finite("mass_fraction_secondary", self.mass_fraction_secondary)
         if not 0.0 < self.mass_fraction_secondary < 1.0:
             raise ValueError(
-                "mass_fraction_secondary must be within (0, 1), "
-                f"got {self.mass_fraction_secondary}"
+                f"mass_fraction_secondary must be within (0, 1), got {self.mass_fraction_secondary}"
             )
         _require_source(self.source, "orbit source")
 
@@ -727,9 +711,7 @@ class Observer:
             return
         if self.kind is ObserverKind.SITE:
             if any(value is None for value in geodetic):
-                raise ValueError(
-                    "a site observer requires longitude_deg, latitude_deg, height_m"
-                )
+                raise ValueError("a site observer requires longitude_deg, latitude_deg, height_m")
             assert self.longitude_deg is not None
             assert self.latitude_deg is not None
             assert self.height_m is not None
@@ -741,21 +723,15 @@ class Observer:
                     f"longitude_deg must be within [-180, 180], got {self.longitude_deg}"
                 )
             if not -90.0 <= self.latitude_deg <= 90.0:
-                raise ValueError(
-                    f"latitude_deg must be within [-90, 90], got {self.latitude_deg}"
-                )
+                raise ValueError(f"latitude_deg must be within [-90, 90], got {self.latitude_deg}")
             if not -500.0 <= self.height_m <= 10000.0:
-                raise ValueError(
-                    f"height_m must be within [-500, 10000], got {self.height_m}"
-                )
+                raise ValueError(f"height_m must be within [-500, 10000], got {self.height_m}")
             return
         if self.kind is ObserverKind.SOLAR_SYSTEM_BODY:
             if not self.body or not self.body.strip():
                 raise ValueError("a solar_system_body observer requires a body name")
             if self.body != self.body.strip().lower():
-                raise ValueError(
-                    f"body must be a lowercase ephemeris body name, got {self.body!r}"
-                )
+                raise ValueError(f"body must be a lowercase ephemeris body name, got {self.body!r}")
             return
         if self.kind in (ObserverKind.SPACECRAFT_TABLE, ObserverKind.SPACECRAFT_SPICE):
             if not self.path or not self.path.strip():
@@ -764,8 +740,7 @@ class Observer:
                 not self.spice_target or not self.spice_target.strip()
             ):
                 raise ValueError(
-                    "a spacecraft_spice observer requires a spice_target "
-                    "(NAIF ID or body name)"
+                    "a spacecraft_spice observer requires a spice_target (NAIF ID or body name)"
                 )
             if not self.checksum_sha256 or not self.checksum_sha256.strip():
                 raise ValueError(
@@ -793,9 +768,7 @@ class Observer:
             "identity",
         )
         offending = [
-            name
-            for name in optional
-            if name not in allowed and getattr(self, name) is not None
+            name for name in optional if name not in allowed and getattr(self, name) is not None
         ]
         # Geodetic-field violations for earth_center keep their original
         # message (raised by the caller); everything else fails here.
@@ -806,9 +779,7 @@ class Observer:
                 if name not in ("longitude_deg", "latitude_deg", "height_m")
             ]
         if offending:
-            raise ValueError(
-                f"a {self.kind.value} observer does not take {sorted(offending)}"
-            )
+            raise ValueError(f"a {self.kind.value} observer does not take {sorted(offending)}")
 
     @classmethod
     def earth_center(cls) -> Observer:
@@ -841,9 +812,7 @@ class Observer:
         )
 
     @classmethod
-    def spacecraft_table(
-        cls, observer_id: str, path: str, *, checksum_sha256: str
-    ) -> Observer:
+    def spacecraft_table(cls, observer_id: str, path: str, *, checksum_sha256: str) -> Observer:
         """A spacecraft observer from a checksummed tabular ephemeris (ECSV)."""
         return cls(
             observer_id=observer_id,
@@ -873,9 +842,7 @@ class Observer:
     @classmethod
     def programmatic(cls, observer_id: str, identity: str) -> Observer:
         """A programmatic observer; register its state function separately."""
-        return cls(
-            observer_id=observer_id, kind=ObserverKind.PROGRAMMATIC, identity=identity
-        )
+        return cls(observer_id=observer_id, kind=ObserverKind.PROGRAMMATIC, identity=identity)
 
 
 @dataclass(frozen=True)
@@ -936,9 +903,7 @@ class RelayRange:
         if self.z_min_au <= 0.0:
             raise ValueError(f"z_min must be positive, got {self.z_min_au} AU")
         if self.z_max_au <= self.z_min_au:
-            raise ValueError(
-                f"z_max ({self.z_max_au} AU) must exceed z_min ({self.z_min_au} AU)"
-            )
+            raise ValueError(f"z_max ({self.z_max_au} AU) must exceed z_min ({self.z_min_au} AU)")
 
 
 @dataclass(frozen=True)
@@ -1160,8 +1125,7 @@ class ObservationInterval:
     def __post_init__(self) -> None:
         if not _EPOCH_ID_PATTERN.match(self.interval_id):
             raise ValueError(
-                "interval_id must be non-empty without whitespace, "
-                f"got {self.interval_id!r}"
+                f"interval_id must be non-empty without whitespace, got {self.interval_id!r}"
             )
         if not self.start < self.stop:
             raise ValueError("observation interval start must precede stop")
@@ -1242,8 +1206,7 @@ class TimeInterval:
     def __post_init__(self) -> None:
         if not _EPOCH_ID_PATTERN.match(self.interval_id):
             raise ValueError(
-                "interval_id must be non-empty without whitespace, "
-                f"got {self.interval_id!r}"
+                f"interval_id must be non-empty without whitespace, got {self.interval_id!r}"
             )
         if not self.start < self.stop:
             raise ValueError("interval start must precede stop")
@@ -1348,25 +1311,14 @@ class GeometryRequest:
         if self.observability is not None:
             site_only.append("observability constraints")
         if site_only and self.observer.kind is not ObserverKind.SITE:
-            raise ValueError(
-                f"{' and '.join(site_only)} require a terrestrial site observer"
-            )
+            raise ValueError(f"{' and '.join(site_only)} require a terrestrial site observer")
         if self.assumed_half_width_arcsec is not None:
             _require_finite("assumed_half_width_arcsec", self.assumed_half_width_arcsec)
             if self.assumed_half_width_arcsec <= 0.0:
                 raise ValueError("assumed_half_width_arcsec must be positive")
-        if (
-            self.fov is not None
-            and self.fov.exposure_s is not None
-            and not self.include_rates
-        ):
-            raise ValueError(
-                "fov.exposure_s (motion padding) requires products.rates: true"
-            )
-        if (
-            OutputFormat.DS9 in self.output_formats
-            and self.assumed_half_width_arcsec is None
-        ):
+        if self.fov is not None and self.fov.exposure_s is not None and not self.include_rates:
+            raise ValueError("fov.exposure_s (motion padding) requires products.rates: true")
+        if OutputFormat.DS9 in self.output_formats and self.assumed_half_width_arcsec is None:
             raise ValueError(
                 "ds9 region output requires an explicit "
                 "uncertainty.assumed_half_width_arcsec: regions carry a width, "
@@ -1443,9 +1395,7 @@ class CrossingsRequest:
             raise ValueError("interval IDs must be unique")
         _require_finite("relay_distance_au", self.relay_distance_au)
         if self.relay_distance_au <= 0.0:
-            raise ValueError(
-                f"relay_distance_au must be positive, got {self.relay_distance_au}"
-            )
+            raise ValueError(f"relay_distance_au must be positive, got {self.relay_distance_au}")
         if self.model_id not in SUPPORTED_MODEL_IDS:
             raise ValueError(
                 f"unknown model ID {self.model_id!r}; supported: {sorted(SUPPORTED_MODEL_IDS)}"
@@ -1463,9 +1413,7 @@ class CrossingsRequest:
                 raise ValueError("report_max_b_au must be positive")
         _require_finite("coarse_step_days", self.coarse_step_days)
         if not (
-            CROSSING_SCAN_STEP_MIN_DAYS
-            <= self.coarse_step_days
-            <= CROSSING_SCAN_STEP_MAX_DAYS
+            CROSSING_SCAN_STEP_MIN_DAYS <= self.coarse_step_days <= CROSSING_SCAN_STEP_MAX_DAYS
         ):
             raise ValueError(
                 "coarse_step_days must be within "
@@ -1625,12 +1573,7 @@ class LocusSample:
             (self.near_icrs_ra_deg, self.near_icrs_dec_deg),
             (self.far_icrs_ra_deg, self.far_icrs_dec_deg),
         ):
-            if (
-                ra is not None
-                and dec is not None
-                and math.isfinite(ra)
-                and math.isfinite(dec)
-            ):
+            if ra is not None and dec is not None and math.isfinite(ra) and math.isfinite(dec):
                 points.append((ra, dec))
         return tuple(points)
 
@@ -1642,9 +1585,7 @@ class LocusSample:
         ``z > d/10`` model bound) as diagnostics; ``validity`` is the
         authoritative gate, finiteness only a backstop.
         """
-        return self.validity is not Validity.INVALID and math.isfinite(
-            self.icrs_ra_deg
-        )
+        return self.validity is not Validity.INVALID and math.isfinite(self.icrs_ra_deg)
 
 
 @dataclass(frozen=True)

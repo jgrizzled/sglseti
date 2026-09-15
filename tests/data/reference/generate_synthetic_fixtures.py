@@ -150,9 +150,7 @@ def fixture_static() -> dict:
             "rho_minus_z_au": fmt(rho - z_au),
         }
     # All roles must share one direction for a static target.
-    dirs = [
-        (r["target_dir_ra_deg"], r["target_dir_dec_deg"]) for r in out["roles"].values()
-    ]
+    dirs = [(r["target_dir_ra_deg"], r["target_dir_dec_deg"]) for r in out["roles"].values()]
     assert dirs.count(dirs[0]) == 3
     return out
 
@@ -243,14 +241,16 @@ def fixture_constant_velocity() -> dict:
 
 
 def main() -> None:
-    print(json.dumps(
-        {
-            "c_au_per_day": fmt(C_AU_PER_DAY),
-            "static": fixture_static(),
-            "constant_velocity": fixture_constant_velocity(),
-        },
-        indent=2,
-    ))
+    print(
+        json.dumps(
+            {
+                "c_au_per_day": fmt(C_AU_PER_DAY),
+                "static": fixture_static(),
+                "constant_velocity": fixture_constant_velocity(),
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

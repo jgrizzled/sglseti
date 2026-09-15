@@ -203,9 +203,7 @@ def test_adaptive_locus_point_count_scales_with_tolerance() -> None:
 
 def test_adaptive_budget_exhaustion_warns() -> None:
     kwargs = common(target=CURVED_TARGET, role=Role.RX)
-    locus = adaptive_locus(
-        relay_range=RANGE, tolerance_arcsec=0.001, max_points=3, **kwargs
-    )
+    locus = adaptive_locus(relay_range=RANGE, tolerance_arcsec=0.001, max_points=3, **kwargs)
     assert WARN_ADAPTIVE_BUDGET in locus.warnings
     assert len(locus.points) <= 3
 
@@ -225,27 +223,20 @@ def test_swept_locus_envelope_contains_instantaneous_loci() -> None:
     interval = ObservationInterval(interval_id="sweep-1", start=T_O, stop=T_O + 2.0)
     kwargs = common(ephemeris=ephemeris)
     del kwargs["observation_time"]
-    swept = swept_locus(
-        interval=interval, relay_range=RANGE, tolerance_arcsec=1.0, **kwargs
-    )
+    swept = swept_locus(interval=interval, relay_range=RANGE, tolerance_arcsec=1.0, **kwargs)
     assert len(swept.loci) >= 3  # ~13 arcsec of drift forces refinement
     assert swept.envelope_pad_arcsec == pytest.approx(2.0)
     assert not swept.warnings
 
     from sglseti.locus import _point_polyline_arcsec, _point_vec
 
-    union_vectors = [
-        [_point_vec(point) for point in locus.points] for locus in swept.loci
-    ]
+    union_vectors = [[_point_vec(point) for point in locus.points] for locus in swept.loci]
     for fraction in np.linspace(0.0, 1.0, 15):
         time = interval.start + fraction * (interval.stop - interval.start)
         for q in np.linspace(1.0 / RANGE.z_max_au, 1.0 / RANGE.z_min_au, 25):
-            point = evaluate_locus(
-                z_au=1.0 / q, observation_time=time, **kwargs
-            )
+            point = evaluate_locus(z_au=1.0 / q, observation_time=time, **kwargs)
             distance = min(
-                _point_polyline_arcsec(_point_vec(point), vectors)
-                for vectors in union_vectors
+                _point_polyline_arcsec(_point_vec(point), vectors) for vectors in union_vectors
             )
             assert distance <= swept.envelope_pad_arcsec
 
@@ -254,9 +245,7 @@ def test_swept_locus_static_ephemeris_needs_no_refinement() -> None:
     interval = ObservationInterval(interval_id="sweep-2", start=T_O, stop=T_O + 2.0)
     kwargs = common()
     del kwargs["observation_time"]
-    swept = swept_locus(
-        interval=interval, relay_range=RANGE, tolerance_arcsec=1.0, **kwargs
-    )
+    swept = swept_locus(interval=interval, relay_range=RANGE, tolerance_arcsec=1.0, **kwargs)
     # A static fake ephemeris means zero drift: boundary polylines only,
     # verified by one midpoint probe.
     assert len(swept.loci) == 2

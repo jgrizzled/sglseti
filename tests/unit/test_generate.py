@@ -33,9 +33,7 @@ from sglseti.models import (
 )
 from sglseti.targets import TargetRegistry
 
-KERNEL = Path(__file__).resolve().parents[1] / "data" / "kernels" / (
-    "de440s_excerpt_2010-2035.bsp"
-)
+KERNEL = Path(__file__).resolve().parents[1] / "data" / "kernels" / ("de440s_excerpt_2010-2035.bsp")
 
 EPHEMERIS = FakeEphemeris((0.004, -0.002, 0.001), (0.558, -0.744, -0.323))
 
@@ -143,8 +141,7 @@ def test_single_vs_batch_numerical_equivalence() -> None:
         assert from_batch.icrs_ra_deg == from_single.icrs_ra_deg
         assert from_batch.icrs_dec_deg == from_single.icrs_dec_deg
         assert (
-            from_batch.catalog_direction_epoch_tdb_jd
-            == from_single.catalog_direction_epoch_tdb_jd
+            from_batch.catalog_direction_epoch_tdb_jd == from_single.catalog_direction_epoch_tdb_jd
         )
         assert from_batch.sample_id == from_single.sample_id
         # calculation_id legitimately differs (different request).
@@ -153,9 +150,7 @@ def test_single_vs_batch_numerical_equivalence() -> None:
 
 def test_unknown_target_fails_clearly() -> None:
     with pytest.raises(GenerationError, match=r"unknown target ID\(s\) \['nope'\]"):
-        generate_loci(
-            make_request(target_ids=("nope",)), make_registry(), ephemeris=EPHEMERIS
-        )
+        generate_loci(make_request(target_ids=("nope",)), make_registry(), ephemeris=EPHEMERIS)
 
 
 def test_grid_materialization() -> None:
@@ -170,9 +165,7 @@ def test_grid_materialization() -> None:
     seconds = [float((e.time - T1).sec) for e in epochs]
     assert seconds == pytest.approx([0.0, 600.0, 1200.0, 1800.0], abs=1e-6)
 
-    result = generate_loci(
-        make_request(time=grid), make_registry(), ephemeris=EPHEMERIS
-    )
+    result = generate_loci(make_request(time=grid), make_registry(), ephemeris=EPHEMERIS)
     assert len(result.samples) == 2 * 4 * 3
 
 
@@ -214,19 +207,14 @@ def test_strict_mode_fails_on_invalid() -> None:
 def test_uncertainty_labeling() -> None:
     unpadded = generate_loci(make_request(), make_registry(), ephemeris=EPHEMERIS)
     assert "uncertainty_not_propagated" in unpadded.warnings
-    assert all(
-        s.uncertainty_method is UncertaintyMethod.NOT_PROPAGATED
-        for s in unpadded.samples
-    )
+    assert all(s.uncertainty_method is UncertaintyMethod.NOT_PROPAGATED for s in unpadded.samples)
     padded = generate_loci(
         make_request(assumed_half_width_arcsec=30.0),
         make_registry(),
         ephemeris=EPHEMERIS,
     )
     assert "uncertainty_not_propagated" not in padded.warnings
-    assert all(
-        s.uncertainty_method is UncertaintyMethod.ASSUMED for s in padded.samples
-    )
+    assert all(s.uncertainty_method is UncertaintyMethod.ASSUMED for s in padded.samples)
     for corridor in padded.corridors:
         assert corridor.assumed_half_width_arcsec == 30.0
         assert corridor.uncertainty_method is UncertaintyMethod.ASSUMED

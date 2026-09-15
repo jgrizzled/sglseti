@@ -55,9 +55,7 @@ OBSERVER = Observer.earth_center()
 
 def provenance(**sigmas: tuple[float, str]) -> tuple[ParameterProvenance, ...]:
     return tuple(
-        ParameterProvenance(
-            parameter=name, source="unit test", uncertainty=value, unit=unit
-        )
+        ParameterProvenance(parameter=name, source="unit test", uncertainty=value, unit=unit)
         for name, (value, unit) in sigmas.items()
     )
 
@@ -128,9 +126,7 @@ def test_no_uncertainties_is_an_error() -> None:
 
 
 def test_unit_mismatch_is_an_error() -> None:
-    target = make_target(
-        parameter_provenance=provenance(parallax_mas=(0.5, "arcsec"))
-    )
+    target = make_target(parameter_provenance=provenance(parallax_mas=(0.5, "arcsec")))
     with pytest.raises(GenerationError, match="requires 'mas'"):
         target_uncertainty(target)
 
@@ -275,9 +271,7 @@ def test_locus_uncertainty_reflects_declared_position_sigma() -> None:
     # 1000 mas of tangent-plane RA uncertainty maps ~1:1 onto the relay
     # direction, entirely in the east component.
     target = make_target(parameter_provenance=provenance(ra_deg=(1000.0, "mas")))
-    result = propagate_locus_uncertainty(
-        target=target, seed=5, count=400, **locus_kwargs()
-    )
+    result = propagate_locus_uncertainty(target=target, seed=5, count=400, **locus_kwargs())
     offsets = np.array(result.offsets_arcsec)
     east_sigma = float(np.std(offsets[:, 0], ddof=1))
     north_sigma = float(np.std(offsets[:, 1], ddof=1))
@@ -288,9 +282,7 @@ def test_locus_uncertainty_reflects_declared_position_sigma() -> None:
     assert 1.7 < result.confidence_radius_arcsec < 2.3
     # Along/cross decomposition preserves total variance (orthonormal).
     total = result.covariance_arcsec2[0][0] + result.covariance_arcsec2[1][1]
-    decomposed = (
-        result.along_track_sigma_arcsec**2 + result.cross_track_sigma_arcsec**2
-    )
+    decomposed = result.along_track_sigma_arcsec**2 + result.cross_track_sigma_arcsec**2
     assert decomposed == pytest.approx(total, rel=1e-6)
     assert result.method is UncertaintyMethod.PROPAGATED
     assert CONTRIBUTION_TARGET_STATE in result.contributions
@@ -302,12 +294,8 @@ def test_locus_uncertainty_reflects_declared_position_sigma() -> None:
 
 def test_locus_uncertainty_is_deterministic() -> None:
     target = make_target(parameter_provenance=provenance(ra_deg=(500.0, "mas")))
-    first = propagate_locus_uncertainty(
-        target=target, seed=9, count=64, **locus_kwargs()
-    )
-    second = propagate_locus_uncertainty(
-        target=target, seed=9, count=64, **locus_kwargs()
-    )
+    first = propagate_locus_uncertainty(target=target, seed=9, count=64, **locus_kwargs())
+    second = propagate_locus_uncertainty(target=target, seed=9, count=64, **locus_kwargs())
     assert first.offsets_arcsec == second.offsets_arcsec
     assert first.confidence_radius_arcsec == second.confidence_radius_arcsec
 
@@ -341,9 +329,7 @@ def crossing_scenario() -> tuple[Target, MovingEphemeris, Any]:
     offset (perturbing b_min); ~100 arcsec at s ~ 5 AU is ~2.4e-3 AU each.
     """
     target = make_target(
-        parameter_provenance=provenance(
-            ra_deg=(100_000.0, "mas"), dec_deg=(100_000.0, "mas")
-        )
+        parameter_provenance=provenance(ra_deg=(100_000.0, "mas"), dec_deg=(100_000.0, "mas"))
     )
     axis = np.array(
         [
@@ -398,11 +384,7 @@ def test_crossing_uncertainty_distribution() -> None:
     )
     assert uncertainty.method is UncertaintyMethod.PROPAGATED
     assert uncertainty.sample_count == 32
-    assert (
-        uncertainty.b_min_lower_au
-        <= uncertainty.b_min_median_au
-        <= uncertainty.b_min_upper_au
-    )
+    assert uncertainty.b_min_lower_au <= uncertainty.b_min_median_au <= uncertainty.b_min_upper_au
     # The 100 arcsec axis tilt at s ~ 5 AU perturbs b by ~2.4e-3 AU.
     assert uncertainty.b_min_median_au == pytest.approx(0.02, rel=0.2)
     assert 5e-4 < uncertainty.b_min_sigma_au < 1e-2
@@ -453,9 +435,7 @@ def test_crossing_uncertainty_flags_window_edges() -> None:
     )
     assert uncertainty.window_edge_count == 8
     assert uncertainty.validity is Validity.DEGRADED
-    assert any(
-        w.startswith(WARN_MINIMUM_AT_WINDOW_EDGE) for w in uncertainty.warnings
-    )
+    assert any(w.startswith(WARN_MINIMUM_AT_WINDOW_EDGE) for w in uncertainty.warnings)
 
 
 def test_crossing_uncertainty_rejects_mismatched_target() -> None:
@@ -490,9 +470,7 @@ def test_crossing_uncertainty_rejects_mismatched_target() -> None:
 
 def test_minimize_impact_parameter_interior_minimum() -> None:
     target, ephemeris, _ = crossing_scenario()
-    interval = ObservationInterval(
-        interval_id="exp-1", start=T_O + 40.0, stop=T_O + 60.0
-    )
+    interval = ObservationInterval(interval_id="exp-1", start=T_O + 40.0, stop=T_O + 60.0)
     sample = minimize_impact_parameter(
         target=target,
         interval=interval,

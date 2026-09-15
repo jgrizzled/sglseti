@@ -159,9 +159,7 @@ def visibility_sample(
         )
     warnings.extend(dict.fromkeys(f"astropy:{w.message}" for w in caught))
     moon_ra, moon_dec = _vector_radec(moon_direction)
-    moon_separation = _separation_deg(
-        sample.icrs_ra_deg, sample.icrs_dec_deg, moon_ra, moon_dec
-    )
+    moon_separation = _separation_deg(sample.icrs_ra_deg, sample.icrs_dec_deg, moon_ra, moon_dec)
     passed, failed_list = evaluate_constraints(
         altitude_deg=altitude,
         sun_altitude_deg=sun_altitude,
@@ -169,9 +167,7 @@ def visibility_sample(
         constraints=constraints,
     )
     failed = list(failed_list)
-    for (ra, dec), (probe_altitude, _azimuth) in zip(
-        probe_points, probe_altaz, strict=True
-    ):
+    for (ra, dec), (probe_altitude, _azimuth) in zip(probe_points, probe_altaz, strict=True):
         probe_passed, probe_failed = evaluate_constraints(
             altitude_deg=probe_altitude,
             sun_altitude_deg=sun_altitude,
@@ -208,9 +204,7 @@ def find_windows(
     same order). Disjoint windows are all returned; none is preferred.
     """
     if len(epochs) != len(visibility):
-        raise PlanningError(
-            f"visibility ({len(visibility)}) and epochs ({len(epochs)}) misaligned"
-        )
+        raise PlanningError(f"visibility ({len(visibility)}) and epochs ({len(epochs)}) misaligned")
     windows: list[VisibilityWindow] = []
     run: list[tuple[Epoch, VisibilitySample]] = []
 

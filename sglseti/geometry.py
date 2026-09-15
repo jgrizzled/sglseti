@@ -125,11 +125,7 @@ def solar_focal_min_au(target_distance_au: float) -> float:
     """
     if target_distance_au <= SOLAR_FOCAL_MIN_AU:
         return math.inf
-    return (
-        SOLAR_FOCAL_MIN_AU
-        * target_distance_au
-        / (target_distance_au - SOLAR_FOCAL_MIN_AU)
-    )
+    return SOLAR_FOCAL_MIN_AU * target_distance_au / (target_distance_au - SOLAR_FOCAL_MIN_AU)
 
 
 @runtime_checkable
@@ -289,9 +285,7 @@ class Tusay2022Eq57V1:
         )
 
 
-def observer_barycentric_au(
-    observer: Observer, time: Time, ephemeris: Ephemeris
-) -> np.ndarray:
+def observer_barycentric_au(observer: Observer, time: Time, ephemeris: Ephemeris) -> np.ndarray:
     """Barycentric ICRS position of the observer in AU (via its provider)."""
     provider = resolve_observer_state_provider(observer, ephemeris)
     position: np.ndarray = np.asarray(provider.state_at(time).position_au, dtype=float)
@@ -330,9 +324,7 @@ def compute_relay_solution(
 ) -> RelaySolution:
     """Compute one locus geometry: direction, relay position, line of sight."""
     with offline_resources():
-        direction = model.target_direction(
-            target, observation_time, z_au, role, ephemeris
-        )
+        direction = model.target_direction(target, observation_time, z_au, role, ephemeris)
         sun = ephemeris.sun_barycentric_au(observation_time)
         obs = observer_barycentric_au(observer, observation_time, ephemeris)
     target_hat = _unit_vector(
@@ -376,9 +368,7 @@ def _site_location(observer: Observer) -> EarthLocation:
     )
 
 
-def cirs_apparent(
-    solution: RelaySolution, *, iers_table: Any | None = None
-) -> tuple[float, float]:
+def cirs_apparent(solution: RelaySolution, *, iers_table: Any | None = None) -> tuple[float, float]:
     """Apparent CIRS RA/Dec of the relay for the solution's observer.
 
     Topocentric CIRS for a site observer, geocentric for Earth center. The
@@ -444,12 +434,8 @@ def motion_rates(
         ephemeris=ephemeris,
         model=model,
     )
-    coord_before = SkyCoord(
-        ra=before.los_icrs_ra_deg * u.deg, dec=before.los_icrs_dec_deg * u.deg
-    )
-    coord_after = SkyCoord(
-        ra=after.los_icrs_ra_deg * u.deg, dec=after.los_icrs_dec_deg * u.deg
-    )
+    coord_before = SkyCoord(ra=before.los_icrs_ra_deg * u.deg, dec=before.los_icrs_dec_deg * u.deg)
+    coord_after = SkyCoord(ra=after.los_icrs_ra_deg * u.deg, dec=after.los_icrs_dec_deg * u.deg)
     d_ra_cosdec, d_dec = coord_before.spherical_offsets_to(coord_after)
     hours = step_s / 3600.0
     return MotionRates(

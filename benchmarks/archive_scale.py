@@ -98,9 +98,7 @@ def make_request(target_count: int, epoch_count: int) -> GeometryRequest:
 
 
 def bench_generate(target_count: int, epoch_count: int) -> None:
-    registry = TargetRegistry.from_targets(
-        tuple(synthetic_target(i) for i in range(target_count))
-    )
+    registry = TargetRegistry.from_targets(tuple(synthetic_target(i) for i in range(target_count)))
     request = make_request(target_count, epoch_count)
     clear_provider_cache()
     started = time.perf_counter()
@@ -139,9 +137,7 @@ def bench_generate(target_count: int, epoch_count: int) -> None:
         stream_time = time.perf_counter() - started
         _, stream_peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
-    print(
-        f"export batch:  {batch_time:8.1f} s, python-heap peak {batch_peak / 1e6:8.1f} MB"
-    )
+    print(f"export batch:  {batch_time:8.1f} s, python-heap peak {batch_peak / 1e6:8.1f} MB")
     print(
         f"export stream: {stream_time:8.1f} s, python-heap peak {stream_peak / 1e6:8.1f} MB "
         "(25k-row ECSV parts)"
@@ -157,9 +153,7 @@ def bench_spacecraft(target_count: int, epoch_count: int) -> None:
     from sglseti.ephemeris import AstropyEphemeris
     from sglseti.provenance import file_sha256
 
-    registry = TargetRegistry.from_targets(
-        tuple(synthetic_target(i) for i in range(target_count))
-    )
+    registry = TargetRegistry.from_targets(tuple(synthetic_target(i) for i in range(target_count)))
     ephemeris = AstropyEphemeris()
     start = Time("2011-12-01T00:00:00", scale="utc").tdb
     half = TimeDelta(0.5, format="jd", scale="tdb")
@@ -167,9 +161,8 @@ def bench_spacecraft(target_count: int, epoch_count: int) -> None:
     for node in range(0, 5300, 5):  # 5-day nodes through 2026-06
         t = start + TimeDelta(float(node), format="jd", scale="tdb")
         earth = ephemeris.earth_barycentric_au(t)
-        velocity = (
-            ephemeris.earth_barycentric_au(t + half)
-            - ephemeris.earth_barycentric_au(t - half)
+        velocity = ephemeris.earth_barycentric_au(t + half) - ephemeris.earth_barycentric_au(
+            t - half
         )
         epochs_jd.append(float(t.tdb.jd))
         positions.append(earth + np.array([0.01, 0.0, 0.0]))  # L2-scale offset
@@ -214,9 +207,7 @@ def bench_spacecraft(target_count: int, epoch_count: int) -> None:
 def bench_vectorized(epoch_count: int = 500) -> None:
     clear_provider_cache()
     provider = resolve_target_state_provider(synthetic_target(0))
-    epochs = Time(
-        np.linspace(2012.0, 2026.0, epoch_count), format="jyear", scale="tdb"
-    )
+    epochs = Time(np.linspace(2012.0, 2026.0, epoch_count), format="jyear", scale="tdb")
     started = time.perf_counter()
     for index in range(epoch_count):
         provider.state_at(epochs[index])

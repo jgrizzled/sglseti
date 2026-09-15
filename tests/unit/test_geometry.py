@@ -118,9 +118,7 @@ def test_finite_source_focal_threshold_exceeds_infinite_source_constant() -> Non
     d_au = 200_000.0
     threshold = solar_focal_min_au(d_au)
     assert threshold > SOLAR_FOCAL_MIN_AU
-    assert threshold == pytest.approx(
-        SOLAR_FOCAL_MIN_AU * d_au / (d_au - SOLAR_FOCAL_MIN_AU)
-    )
+    assert threshold == pytest.approx(SOLAR_FOCAL_MIN_AU * d_au / (d_au - SOLAR_FOCAL_MIN_AU))
     between = (SOLAR_FOCAL_MIN_AU + threshold) / 2.0
     solution = MODEL.target_direction(make_target(), T_O, between, Role.ANTIPODE, EPHEMERIS)
     assert "below_solar_focal_minimum" in solution.warnings
@@ -130,9 +128,7 @@ def test_finite_source_focal_threshold_exceeds_infinite_source_constant() -> Non
 
 
 def test_missing_radial_velocity_degrades_explicitly() -> None:
-    target = make_target(
-        radial_velocity_km_s=None, flags=("missing_radial_velocity",)
-    )
+    target = make_target(radial_velocity_km_s=None, flags=("missing_radial_velocity",))
     solution = MODEL.target_direction(target, T_O, 1000.0, Role.ANTIPODE, EPHEMERIS)
     assert solution.validity is Validity.DEGRADED
     assert "missing_radial_velocity" in solution.warnings
@@ -154,10 +150,7 @@ def test_epoch_semantics_and_flags_are_fixed() -> None:
     assert solution.linear_stellar_motion_assumed
     assert solution.solar_motion_neglected
     # rho = z: the observer-relay light time equals the Sun-relay light time.
-    assert (
-        solution.observer_relay_light_time_days_approx
-        == solution.sun_relay_light_time_days
-    )
+    assert solution.observer_relay_light_time_days_approx == solution.sun_relay_light_time_days
 
 
 def test_observer_barycentric_earth_center_equals_ephemeris_earth() -> None:
@@ -202,9 +195,7 @@ def test_earth_center_vs_topocentric_parallax() -> None:
 
 
 def test_ephemeris_coverage_error_propagates() -> None:
-    limited = FakeEphemeris(
-        (0.0, 0.0, 0.0), (1.0, 0.0, 0.0), coverage_jd=(2400000.0, 2450000.0)
-    )
+    limited = FakeEphemeris((0.0, 0.0, 0.0), (1.0, 0.0, 0.0), coverage_jd=(2400000.0, 2450000.0))
     with pytest.raises(EphemerisCoverageError, match="outside fake coverage"):
         compute_relay_solution(
             target=make_target(),
@@ -219,9 +210,7 @@ def test_ephemeris_coverage_error_propagates() -> None:
 
 def test_jpl_file_adapter_missing_kernel() -> None:
     with pytest.raises(EphemerisError, match="not found"):
-        AstropyEphemeris(
-            EphemerisSpec(adapter=EphemerisAdapter.JPL_FILE, path="/nonexistent.bsp")
-        )
+        AstropyEphemeris(EphemerisSpec(adapter=EphemerisAdapter.JPL_FILE, path="/nonexistent.bsp"))
 
 
 def test_no_global_iers_mutation() -> None:

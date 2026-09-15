@@ -37,9 +37,7 @@ def planned():
     return build_small_result(
         planned=True,
         relay_range=RelayRange(550.0, 2500.0),
-        sampling=SamplingSpec(
-            kind=SamplingKind.RECIPROCAL_STEP, step_arcsec=15.0
-        ),
+        sampling=SamplingSpec(kind=SamplingKind.RECIPROCAL_STEP, step_arcsec=15.0),
         fov=FieldOfView(radius_arcsec=10.0, exposure_s=None),
         assumed_half_width_arcsec=None,
         output_formats=(OutputFormat.JSON,),
@@ -116,9 +114,7 @@ def test_pointings_state_their_covered_relay_interval(planned) -> None:
 
 def test_explicit_point_segments_have_coincident_boundaries() -> None:
     result = build_small_result(
-        sampling=SamplingSpec(
-            kind=SamplingKind.EXPLICIT, distances_au=(600.0, 1200.0)
-        ),
+        sampling=SamplingSpec(kind=SamplingKind.EXPLICIT, distances_au=(600.0, 1200.0)),
         output_formats=(OutputFormat.JSON,),
         assumed_half_width_arcsec=None,
     )

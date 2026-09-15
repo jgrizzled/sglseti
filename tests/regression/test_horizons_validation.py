@@ -36,9 +36,7 @@ from sglseti.geometry import C_AU_PER_DAY, observer_barycentric_au
 from sglseti.models import EphemerisAdapter, EphemerisSpec, Observer
 
 FIXTURE = load_reference_fixture("horizons_reference.yaml")
-KERNEL = Path(__file__).resolve().parents[1] / "data" / "kernels" / (
-    "de440s_excerpt_2010-2035.bsp"
-)
+KERNEL = Path(__file__).resolve().parents[1] / "data" / "kernels" / ("de440s_excerpt_2010-2035.bsp")
 KM_PER_AU = 149_597_870.700
 
 pytest.importorskip("jplephem")
@@ -46,9 +44,7 @@ pytest.importorskip("jplephem")
 
 @pytest.fixture(scope="module")
 def kernel_ephemeris() -> AstropyEphemeris:
-    return AstropyEphemeris(
-        EphemerisSpec(adapter=EphemerisAdapter.JPL_FILE, path=str(KERNEL))
-    )
+    return AstropyEphemeris(EphemerisSpec(adapter=EphemerisAdapter.JPL_FILE, path=str(KERNEL)))
 
 
 def _reference_vector(row: dict) -> np.ndarray:
@@ -85,9 +81,7 @@ def _sun_direction_separations_mas(
             observer_au = observer_barycentric_au(observer, time, kernel)
             sun_au = kernel.sun_barycentric_au(time)
             if retarded:
-                light_time_days = (
-                    float(np.linalg.norm(sun_au - observer_au)) / C_AU_PER_DAY
-                )
+                light_time_days = float(np.linalg.norm(sun_au - observer_au)) / C_AU_PER_DAY
                 sun_au = kernel.sun_barycentric_au(
                     time - TimeDelta(light_time_days, format="jd", scale="tdb")
                 )
@@ -97,9 +91,7 @@ def _sun_direction_separations_mas(
         separations.append(
             float(
                 SkyCoord(ra * u.deg, dec * u.deg)
-                .separation(
-                    SkyCoord(row["ra_deg"] * u.deg, row["dec_deg"] * u.deg)
-                )
+                .separation(SkyCoord(row["ra_deg"] * u.deg, row["dec_deg"] * u.deg))
                 .to_value(u.mas)
             )
         )
@@ -108,9 +100,7 @@ def _sun_direction_separations_mas(
 
 def _green_bank() -> Observer:
     site = FIXTURE["green_bank_site"]
-    return Observer.from_geodetic(
-        "green-bank", site["lon_deg"], site["lat_deg"], site["height_m"]
-    )
+    return Observer.from_geodetic("green-bank", site["lon_deg"], site["lat_deg"], site["height_m"])
 
 
 @pytest.mark.parametrize(

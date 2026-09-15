@@ -50,9 +50,7 @@ from astropy.coordinates import (
 from astropy.time import Time, TimeDelta
 from astropy.utils import iers
 
-KERNEL = Path(__file__).resolve().parents[1] / "kernels" / (
-    "de440s_excerpt_2010-2035.bsp"
-)
+KERNEL = Path(__file__).resolve().parents[1] / "kernels" / ("de440s_excerpt_2010-2035.bsp")
 
 C_AU_PER_DAY = 299_792_458 * 86_400 / 149_597_870_700
 KM_PER_AU = 149_597_870.700
@@ -108,21 +106,15 @@ def axis_hat(time: Time) -> np.ndarray:
     t_tdb = time.tdb
     at_t = catalog().apply_space_motion(new_obstime=t_tdb)
     d_days = float(at_t.distance.to_value(u.au)) / C_AU_PER_DAY
-    aimed = catalog().apply_space_motion(
-        new_obstime=t_tdb + TimeDelta(2.0 * d_days, format="jd")
-    )
+    aimed = catalog().apply_space_motion(new_obstime=t_tdb + TimeDelta(2.0 * d_days, format="jd"))
     ra = math.radians(float(aimed.ra.deg))
     dec = math.radians(float(aimed.dec.deg))
-    return np.array(
-        [math.cos(dec) * math.cos(ra), math.cos(dec) * math.sin(ra), math.sin(dec)]
-    )
+    return np.array([math.cos(dec) * math.cos(ra), math.cos(dec) * math.sin(ra), math.sin(dec)])
 
 
 def body_au(body: str, time: Time) -> np.ndarray:
     with solar_system_ephemeris.set(str(KERNEL)):
-        return np.asarray(
-            get_body_barycentric(body, time).xyz.to_value(u.au), dtype=float
-        )
+        return np.asarray(get_body_barycentric(body, time).xyz.to_value(u.au), dtype=float)
 
 
 def impact_rsun(time: Time) -> float:
@@ -175,9 +167,7 @@ def tx_pointing_from_trappist(time: Time) -> tuple[float, float]:
         height=TRAPPIST_SOUTH["height_m"] * u.m,
     )
     with iers.conf.set_temp("auto_download", False):
-        site = np.asarray(
-            location.get_gcrs_posvel(time)[0].xyz.to_value(u.au), dtype=float
-        )
+        site = np.asarray(location.get_gcrs_posvel(time)[0].xyz.to_value(u.au), dtype=float)
     observer = body_au("earth", time) + site
     los = relay - observer
     los /= np.linalg.norm(los)
@@ -197,9 +187,7 @@ def main() -> None:
             "computed_crossing_utc": str(t_min.utc.isot),
             "computed_crossing_tdb_jd": float(t_min.tdb.jd),
             "computed_b_min_rsun": b_min,
-            "offset_from_published_hours": float(
-                (t_min.tdb - published_time.tdb).to_value(u.h)
-            ),
+            "offset_from_published_hours": float((t_min.tdb - published_time.tdb).to_value(u.h)),
             "b_at_published_epoch_rsun": impact_rsun(published_time),
         }
     ra_2015, dec_2015 = tx_pointing_from_trappist(

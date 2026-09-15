@@ -72,15 +72,9 @@ class TestWorstCaseVisibility:
         # Representative near zenith passes; a probe far down the sky fails
         # the altitude constraint — the verdict must cover the probe.
         common = dict(
-            epoch=Epoch(
-                epoch_id="e1", time=Time("2021-11-06T00:00:00", scale="utc")
-            ),
-            observer=Observer.from_geodetic(
-                "test-site", -111.6003, 31.9583, 2096.0
-            ),
-            ephemeris=FakeEphemeris(
-                (0.004, -0.002, 0.001), (0.558, -0.744, -0.323)
-            ),
+            epoch=Epoch(epoch_id="e1", time=Time("2021-11-06T00:00:00", scale="utc")),
+            observer=Observer.from_geodetic("test-site", -111.6003, 31.9583, 2096.0),
+            ephemeris=FakeEphemeris((0.004, -0.002, 0.001), (0.558, -0.744, -0.323)),
             constraints=ObservabilityConstraints(
                 min_target_altitude_deg=0.0,
                 max_sun_altitude_deg=90.0,

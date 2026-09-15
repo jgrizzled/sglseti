@@ -71,9 +71,7 @@ def test_expected_sha_conflicting_with_pin_rejected(tmp_path: Path) -> None:
         fetch_kernel("de440s", tmp_path, expected_sha256="sha256:" + "0" * 64)
 
 
-def test_cli_fetch_ephemeris_by_url(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_cli_fetch_ephemeris_by_url(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     from sglseti.cli import main
 
     url, checksum = make_source(tmp_path)

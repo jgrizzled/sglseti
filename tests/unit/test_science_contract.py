@@ -134,8 +134,7 @@ def test_static_fixture_epoch_arithmetic_and_role_identity() -> None:
 def test_constant_velocity_fixture_offsets() -> None:
     fixture = load("constant_velocity_synthetic.yaml")
     mu_arcsec_per_day = (
-        fixture["inputs"]["equivalent_catalog_parameters"]["pm_ra_cosdec_arcsec_per_yr"]
-        / 365.25
+        fixture["inputs"]["equivalent_catalog_parameters"]["pm_ra_cosdec_arcsec_per_yr"] / 365.25
     )
     expected = fixture["expected"]
     tol = 0.005  # arcsec, on first-order comparisons of frozen values
@@ -158,10 +157,7 @@ def test_constant_velocity_fixture_offsets() -> None:
     # Physical event epoch = catalog epoch - d/c (to sub-second precision).
     d_over_c = fixture["derived"]["d_au_declared"] / C_AU_PER_DAY
     for role in ("antipode", "rx", "tx"):
-        gap = (
-            expected[role]["catalog_epoch_u_days"]
-            - expected[role]["physical_event_epoch_days"]
-        )
+        gap = expected[role]["catalog_epoch_u_days"] - expected[role]["physical_event_epoch_days"]
         assert abs(gap - d_over_c) < 1e-4
 
 
@@ -182,10 +178,7 @@ def test_double_retarded_negative_fixture() -> None:
         < fixture["tolerance"]["offset_arcsec_abs"]
     )
     # The wrong construction must sit far outside the direction tolerance.
-    assert (
-        detection["offset_from_correct_rx_arcsec"]
-        > detection["min_detectable_offset_arcsec"]
-    )
+    assert detection["offset_from_correct_rx_arcsec"] > detection["min_detectable_offset_arcsec"]
     # Wrong epoch = correct rx epoch - d/c.
     u_rx = base["expected"]["rx"]["catalog_epoch_u_days"]
     assert abs(fixture["wrong_construction"]["catalog_epoch_u_days"] - (u_rx - d_over_c)) < 1e-4
@@ -198,9 +191,7 @@ def test_barnard_scale_check_rederivation() -> None:
     assert math.isclose(mu, fixture["derived"]["mu_total_mas_per_yr"], rel_tol=1e-9)
     d_au = 1000.0 / inputs["parallax_mas"] * AU_PER_PC
     two_d_over_c_years = 2.0 * d_au / C_AU_PER_DAY / 365.25
-    assert math.isclose(
-        two_d_over_c_years, fixture["derived"]["two_d_over_c_years"], rel_tol=1e-9
-    )
+    assert math.isclose(two_d_over_c_years, fixture["derived"]["two_d_over_c_years"], rel_tol=1e-9)
     expected = fixture["expected"]
     for z_key, z_au in (("z_550_au", 550.0), ("z_2500_au", 2500.0)):
         first_order = mu / 1000.0 * (2.0 * z_au / C_AU_PER_DAY / 365.25)
@@ -227,16 +218,10 @@ def test_alpha_cen_fixture_role_epochs() -> None:
         key = f"{z_au:g}"
         assert abs(expected[f"antipode_z{key}"]["catalog_epoch_tdb_jd"] - t_o) < 1e-6
         assert (
-            abs(
-                expected[f"rx_z{key}"]["catalog_epoch_tdb_jd"]
-                - (t_o - 2.0 * z_au / C_AU_PER_DAY)
-            )
+            abs(expected[f"rx_z{key}"]["catalog_epoch_tdb_jd"] - (t_o - 2.0 * z_au / C_AU_PER_DAY))
             < 1e-6
         )
-        assert (
-            abs(expected[f"tx_z{key}"]["catalog_epoch_tdb_jd"] - (t_o + two_d_over_c))
-            < 1e-6
-        )
+        assert abs(expected[f"tx_z{key}"]["catalog_epoch_tdb_jd"] - (t_o + two_d_over_c)) < 1e-6
     # z=550 sits just above the solar focal minimum; validity bound z < d/10.
     assert 550.0 < d_au / 10.0
     # rho ~= z within ~1.1 au for a terrestrial observer.

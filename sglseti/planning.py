@@ -155,9 +155,7 @@ def _zone_for(
     padding = 0.0
     if exposure_s is not None:
         fastest = max(
-            math.hypot(
-                s.rate_ra_cosdec_arcsec_per_hr or 0.0, s.rate_dec_arcsec_per_hr or 0.0
-            )
+            math.hypot(s.rate_ra_cosdec_arcsec_per_hr or 0.0, s.rate_dec_arcsec_per_hr or 0.0)
             for s in samples
         )
         fastest = max(
@@ -200,9 +198,7 @@ def group_corridor_samples(
         end = index + 1
         zone = _zone_for(samples[index:end], assumed_half_width_arcsec, exposure_s)
         while end < len(samples):
-            candidate = _zone_for(
-                samples[index : end + 1], assumed_half_width_arcsec, exposure_s
-            )
+            candidate = _zone_for(samples[index : end + 1], assumed_half_width_arcsec, exposure_s)
             if candidate.radius_arcsec > usable_radius_arcsec:
                 break
             zone = candidate
@@ -276,14 +272,10 @@ def plan_commensal(
                 visibility=tuple(role_visibility),
             )
             if not windows:
-                planning_warnings.append(
-                    f"{WARN_NO_VISIBLE_WINDOW}:{target_id}/{role.value}"
-                )
+                planning_warnings.append(f"{WARN_NO_VISIBLE_WINDOW}:{target_id}/{role.value}")
                 continue
             for window_index, window in enumerate(windows):
-                corridor = corridor_index[
-                    (target_id, role.value, window.representative_epoch_id)
-                ]
+                corridor = corridor_index[(target_id, role.value, window.representative_epoch_id)]
                 operational = _operational_samples(corridor)
                 if not operational:
                     planning_warnings.append(
@@ -378,9 +370,7 @@ def _window_drift_arcsec(
             for ra, dec in sample.coverage_radec():
                 max_extent = max(
                     max_extent,
-                    _separation_arcsec(
-                        zone.center_ra_deg, zone.center_dec_deg, ra, dec
-                    ),
+                    _separation_arcsec(zone.center_ra_deg, zone.center_dec_deg, ra, dec),
                 )
     return max_extent - zone.track_extent_arcsec
 
@@ -406,9 +396,7 @@ def _build_pointing(
     if radius_arcsec > usable_radius_arcsec:
         warning_list.append(WARN_GROUP_EXCEEDS_FOV)
     group_codes = {code for sample in group for code in sample.warnings}
-    warning_list.extend(
-        code for code in _PROPAGATED_SAMPLE_CONDITIONS if code in group_codes
-    )
+    warning_list.extend(code for code in _PROPAGATED_SAMPLE_CONDITIONS if code in group_codes)
     warnings = tuple(warning_list)
     sample_ids = tuple(sample.sample_id for sample in group)
     pointing_id = stable_id(

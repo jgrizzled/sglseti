@@ -74,9 +74,7 @@ def write_state_table(
     return path
 
 
-def linear_table(
-    path: Path, *, start_jd: float, stop_jd: float, samples: int = 40
-) -> Path:
+def linear_table(path: Path, *, start_jd: float, stop_jd: float, samples: int = 40) -> Path:
     """Tabulate the linear provider's own states: the equivalence oracle."""
     reference = LinearAstrometryV1(
         Target(
@@ -141,7 +139,9 @@ def table(tmp_path: Path) -> Path:
 def test_spec_requires_checksum_and_known_semantics() -> None:
     with pytest.raises(ValueError, match="CHECKSUMMED"):
         SampledStateSpec(
-            path="x.ecsv", checksum_sha256="", epoch_semantics="ssb_light_arrival_time",
+            path="x.ecsv",
+            checksum_sha256="",
+            epoch_semantics="ssb_light_arrival_time",
             source="s",
         )
     with pytest.raises(ValueError, match="epoch_semantics must be one of"):
@@ -229,9 +229,7 @@ def test_registry_v2_parses_sampled_state(tmp_path: Path, table: Path) -> None:
     assert target.sampled_state is not None
     # Round-trip through the normalized form.
     normalized = tmp_path / "normalized.yaml"
-    normalized.write_text(
-        yaml.safe_dump(registry.to_normalized_dict()), encoding="utf-8"
-    )
+    normalized.write_text(yaml.safe_dump(registry.to_normalized_dict()), encoding="utf-8")
     reloaded = load_target_registry(normalized)
     assert reloaded["sampled"] == target
     # Missing checksum is a schema error, not a default.
@@ -299,9 +297,10 @@ def test_sampled_states_match_the_tabulated_linear_motion(table: Path) -> None:
     vector_states = provider.states_at(
         Time([BASE_JD - 350.0, BASE_JD + 200.3], format="jd", scale="tdb")
     )
-    assert vector_states[0].ra_deg == provider.state_at(
-        Time(BASE_JD - 350.0, format="jd", scale="tdb")
-    ).ra_deg
+    assert (
+        vector_states[0].ra_deg
+        == provider.state_at(Time(BASE_JD - 350.0, format="jd", scale="tdb")).ra_deg
+    )
 
 
 def test_sampled_metadata_declarations(table: Path) -> None:

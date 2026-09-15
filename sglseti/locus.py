@@ -131,8 +131,7 @@ def _point_polyline_arcsec(p: np.ndarray, vectors: list[np.ndarray]) -> float:
     if len(vectors) == 1:
         return _angle_arcsec(p, vectors[0])
     return min(
-        _point_segment_arcsec(p, vectors[i], vectors[i + 1])
-        for i in range(len(vectors) - 1)
+        _point_segment_arcsec(p, vectors[i], vectors[i + 1]) for i in range(len(vectors) - 1)
     )
 
 
@@ -236,14 +235,9 @@ def adaptive_locus(
             q = low.q_per_au + fraction * (high.q_per_au - low.q_per_au)
             probes.append(evaluate(1.0 / q))
         deviation = max(
-            _point_segment_arcsec(_point_vec(probe), vec_low, vec_high)
-            for probe in probes
+            _point_segment_arcsec(_point_vec(probe), vec_low, vec_high) for probe in probes
         )
-        if (
-            deviation <= half_tolerance
-            or depth >= _MAX_DEPTH
-            or committed_points >= max_points
-        ):
+        if deviation <= half_tolerance or depth >= _MAX_DEPTH or committed_points >= max_points:
             achieved = max(achieved, deviation)
             if deviation > half_tolerance:
                 budget_hit = True
@@ -303,9 +297,7 @@ def swept_locus(
     the returned polylines. Budget exhaustion attaches
     :data:`WARN_TIME_BUDGET` rather than silently weakening the claim.
     """
-    time_tolerance = (
-        tolerance_arcsec if time_tolerance_arcsec is None else time_tolerance_arcsec
-    )
+    time_tolerance = tolerance_arcsec if time_tolerance_arcsec is None else time_tolerance_arcsec
     if not math.isfinite(time_tolerance) or time_tolerance <= 0.0:
         raise ValueError(f"time_tolerance_arcsec must be positive, got {time_tolerance}")
     if max_time_samples < 2:
@@ -469,10 +461,7 @@ def covered_z_intervals(
 
     def refine_boundary(inside: LocusPoint, outside: LocusPoint) -> LocusPoint:
         for _ in range(60):
-            if (
-                _angle_arcsec(_point_vec(inside), _point_vec(outside))
-                <= tolerance_arcsec
-            ):
+            if _angle_arcsec(_point_vec(inside), _point_vec(outside)) <= tolerance_arcsec:
                 break
             q_mid = 0.5 * (inside.q_per_au + outside.q_per_au)
             middle = evaluate(1.0 / q_mid)

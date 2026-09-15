@@ -134,6 +134,7 @@ def provider_cache_stats() -> dict[str, int]:
         "misses": _PROVIDER_CACHE_STATS["misses"],
     }
 
+
 #: Epoch semantics of the v1 catalog-propagation contract (ADR-0001): the
 #: epoch handed to ``state_at`` is an SSB light-arrival epoch in the
 #: Gaia/ERFA convention, never a physical target-event epoch.
@@ -404,9 +405,7 @@ class LinearAstrometryV1:
         warnings = tuple(f"astropy:{w.message}" for w in caught)
         ra = np.atleast_1d(np.asarray(propagated.ra.deg, dtype=float))
         dec = np.atleast_1d(np.asarray(propagated.dec.deg, dtype=float))
-        distance = np.atleast_1d(
-            np.asarray(propagated.distance.to_value(u.au), dtype=float)
-        )
+        distance = np.atleast_1d(np.asarray(propagated.distance.to_value(u.au), dtype=float))
         return tuple(
             TargetState(
                 epoch=epochs[index],
@@ -432,9 +431,7 @@ def _offset_state(
 ) -> TargetState:
     """Apply a tangential (on-sky) offset to a propagated state."""
     coord = SkyCoord(ra=base.ra_deg * u.deg, dec=base.dec_deg * u.deg, frame="icrs")
-    shifted = coord.spherical_offsets_by(
-        d_ra_cosdec_arcsec * u.arcsec, d_dec_arcsec * u.arcsec
-    )
+    shifted = coord.spherical_offsets_by(d_ra_cosdec_arcsec * u.arcsec, d_dec_arcsec * u.arcsec)
     return TargetState(
         epoch=base.epoch,
         ra_deg=float(shifted.ra.deg),
@@ -484,14 +481,10 @@ def _eccentric_anomaly(mean_anomaly_rad: float, eccentricity: float) -> float:
         ecc_anom -= delta
         if abs(delta) < 1e-14:
             return ecc_anom
-    raise ValueError(
-        f"Kepler solver did not converge for M={mean_anomaly_rad}, e={eccentricity}"
-    )
+    raise ValueError(f"Kepler solver did not converge for M={mean_anomaly_rad}, e={eccentricity}")
 
 
-def _relative_orbit_offset_arcsec(
-    orbit: OrbitSolution, epoch_jyear: float
-) -> tuple[float, float]:
+def _relative_orbit_offset_arcsec(orbit: OrbitSolution, epoch_jyear: float) -> tuple[float, float]:
     """(north, east) offset of the secondary from the primary in arcsec.
 
     Standard visual-binary convention (Campbell elements, position angles
@@ -533,9 +526,7 @@ class AccelerationAstrometryV1(LinearAstrometryV1):
 
     def __init__(self, target: Target) -> None:
         if target.acceleration is None:
-            raise ValueError(
-                "acceleration_astrometry_v1 requires a target with acceleration terms"
-            )
+            raise ValueError("acceleration_astrometry_v1 requires a target with acceleration terms")
         super().__init__(target)
         self._acceleration = target.acceleration
 
@@ -559,9 +550,7 @@ class AccelerationAstrometryV1(LinearAstrometryV1):
             d_ra_cosdec_arcsec=(
                 self._acceleration.accel_ra_cosdec_mas_per_yr2 * half_dt2_yr2 / 1000.0
             ),
-            d_dec_arcsec=(
-                self._acceleration.accel_dec_mas_per_yr2 * half_dt2_yr2 / 1000.0
-            ),
+            d_dec_arcsec=(self._acceleration.accel_dec_mas_per_yr2 * half_dt2_yr2 / 1000.0),
         )
 
     def states_at(self, epochs: Time) -> tuple[TargetState, ...]:
@@ -645,10 +634,7 @@ class TwoBodyOrbitV1(LinearAstrometryV1):
         # application is worth batching (and matches the scalar path
         # value-for-value because the per-epoch offsets are identical).
         jyears = np.atleast_1d(np.asarray(epochs.tdb.jyear, dtype=float))
-        offsets = [
-            _relative_orbit_offset_arcsec(self._orbit, float(jyear))
-            for jyear in jyears
-        ]
+        offsets = [_relative_orbit_offset_arcsec(self._orbit, float(jyear)) for jyear in jyears]
         return _offset_states(
             base_states,
             np.array([east * self._offset_factor for _, east in offsets]),
@@ -684,9 +670,7 @@ class SampledStateV1:
 
     def __init__(self, target: Target) -> None:
         if target.sampled_state is None:
-            raise ValueError(
-                "sampled_state_v1 requires a target with a sampled_state spec"
-            )
+            raise ValueError("sampled_state_v1 requires a target with a sampled_state spec")
         spec = target.sampled_state
         self.target = target
         self.epoch_semantics = spec.epoch_semantics
@@ -699,9 +683,7 @@ class SampledStateV1:
         )
         mid_jd = 0.5 * float(self._table.epochs_jd[0] + self._table.epochs_jd[-1])
         mid_state = self._state_at_jd(mid_jd)
-        reference = LinearAstrometryV1(target).state_at(
-            Time(mid_jd, format="jd", scale="tdb")
-        )
+        reference = LinearAstrometryV1(target).state_at(Time(mid_jd, format="jd", scale="tdb"))
         separation_deg = math.degrees(
             math.acos(
                 min(
@@ -784,9 +766,7 @@ class SampledStateV1:
         positions, _ = self._table.interpolate(jds)
         distances = np.linalg.norm(positions, axis=1)
         ras = np.degrees(np.arctan2(positions[:, 1], positions[:, 0])) % 360.0
-        decs = np.degrees(
-            np.arcsin(np.clip(positions[:, 2] / distances, -1.0, 1.0))
-        )
+        decs = np.degrees(np.arcsin(np.clip(positions[:, 2] / distances, -1.0, 1.0)))
         return tuple(
             TargetState(
                 epoch=epochs[index],
@@ -855,9 +835,7 @@ class EarthCenterObserverV1:
         )
 
     def positions_au(self, epochs: Time) -> np.ndarray:
-        return _positions_matrix(
-            self._ephemeris.earth_barycentric_au(epochs), int(epochs.size)
-        )
+        return _positions_matrix(self._ephemeris.earth_barycentric_au(epochs), int(epochs.size))
 
 
 class TerrestrialSiteObserverV1:
@@ -875,8 +853,7 @@ class TerrestrialSiteObserverV1:
     def __init__(self, observer: Observer, ephemeris: Ephemeris) -> None:
         if observer.kind is not ObserverKind.SITE:
             raise ValueError(
-                f"terrestrial_site_v1 requires a site observer, "
-                f"got kind {observer.kind.value!r}"
+                f"terrestrial_site_v1 requires a site observer, got kind {observer.kind.value!r}"
             )
         assert observer.longitude_deg is not None
         self.observer = observer
@@ -957,8 +934,7 @@ def _positions_matrix(raw: object, count: int) -> np.ndarray:
     if array.shape == (count, 3):
         return array
     raise ValueError(
-        f"cannot interpret an ephemeris position array of shape {array.shape} "
-        f"for {count} epochs"
+        f"cannot interpret an ephemeris position array of shape {array.shape} for {count} epochs"
     )
 
 
@@ -1055,9 +1031,7 @@ class SolarSystemBodyObserverV1:
         )
 
     def state_at(self, epoch: Time) -> ObserverState:
-        position = np.asarray(
-            self._ephemeris.body_barycentric_au(self._body, epoch), dtype=float
-        )
+        position = np.asarray(self._ephemeris.body_barycentric_au(self._body, epoch), dtype=float)
         return ObserverState(
             epoch=epoch,
             position_au=(float(position[0]), float(position[1]), float(position[2])),
@@ -1109,9 +1083,7 @@ class _CartesianEphemerisTable:
         try:
             table = Table.read(path, format="ascii.ecsv")
         except Exception as exc:
-            raise EphemerisError(
-                f"failed to parse {description} {path.name}: {exc}"
-            ) from exc
+            raise EphemerisError(f"failed to parse {description} {path.name}: {exc}") from exc
         missing = [name for name in self._COLUMNS if name not in table.colnames]
         if missing:
             raise EphemerisError(f"{description} {path.name} lacks columns {missing}")
@@ -1129,16 +1101,10 @@ class _CartesianEphemerisTable:
         )
         if len(self.epochs_jd) < 2:
             raise EphemerisError(f"{description} {path.name} needs at least two rows")
-        if not np.all(np.isfinite(self.epochs_jd)) or not np.all(
-            np.isfinite(self.positions)
-        ):
-            raise EphemerisError(
-                f"{description} {path.name} contains non-finite values"
-            )
+        if not np.all(np.isfinite(self.epochs_jd)) or not np.all(np.isfinite(self.positions)):
+            raise EphemerisError(f"{description} {path.name} contains non-finite values")
         if np.any(np.diff(self.epochs_jd) <= 0.0):
-            raise EphemerisError(
-                f"{description} {path.name} epochs must be strictly increasing"
-            )
+            raise EphemerisError(f"{description} {path.name} epochs must be strictly increasing")
         self.interpolation = "cubic_hermite" if has_velocities else "linear"
         self._coverage_label = coverage_label
         self._owner = owner
@@ -1296,8 +1262,7 @@ class SpiceSpacecraftObserverV1:
             import spiceypy  # type: ignore[import-untyped]
         except ImportError as exc:
             raise EphemerisError(
-                "the spacecraft_spice observer requires the optional "
-                "'spiceypy' dependency"
+                "the spacecraft_spice observer requires the optional 'spiceypy' dependency"
             ) from exc
         self._spice = spiceypy
         path = Path(observer.path)
@@ -1319,25 +1284,19 @@ class SpiceSpacecraftObserverV1:
             try:
                 self._target_id = int(spiceypy.bods2c(target))
             except Exception as exc:
-                raise EphemerisError(
-                    f"unknown SPICE target {target!r}: {exc}"
-                ) from exc
+                raise EphemerisError(f"unknown SPICE target {target!r}: {exc}") from exc
         try:
             self._handle = spiceypy.spklef(str(path))
             cell = spiceypy.cell_double(200)
             spiceypy.spkcov(str(path), self._target_id, cell)
-            windows = [
-                spiceypy.wnfetd(cell, i) for i in range(spiceypy.wncard(cell))
-            ]
+            windows = [spiceypy.wnfetd(cell, i) for i in range(spiceypy.wncard(cell))]
         except Exception as exc:
             raise EphemerisError(
-                f"failed to load SPICE kernel {path.name} for target "
-                f"{self._target_id}: {exc}"
+                f"failed to load SPICE kernel {path.name} for target {self._target_id}: {exc}"
             ) from exc
         if not windows:
             raise EphemerisError(
-                f"SPICE kernel {path.name} has no coverage for target "
-                f"{self._target_id}"
+                f"SPICE kernel {path.name} has no coverage for target {self._target_id}"
             )
         self._windows_et = windows
         self.observer = observer
@@ -1374,18 +1333,14 @@ class SpiceSpacecraftObserverV1:
                 f"{self.coverage} for observer {self.observer.observer_id!r}"
             )
         try:
-            state, _light_time = self._spice.spkgeo(
-                targ=self._target_id, et=et, ref="J2000", obs=0
-            )
+            state, _light_time = self._spice.spkgeo(targ=self._target_id, et=et, ref="J2000", obs=0)
         except Exception as exc:
             raise EphemerisCoverageError(
                 f"SPICE evaluation failed at {epoch.isot} for observer "
                 f"{self.observer.observer_id!r}: {exc}"
             ) from exc
         position = tuple(float(v) / self._KM_PER_AU for v in state[:3])
-        velocity = tuple(
-            float(v) * 86400.0 / self._KM_PER_AU for v in state[3:6]
-        )
+        velocity = tuple(float(v) * 86400.0 / self._KM_PER_AU for v in state[3:6])
         return ObserverState(
             epoch=epoch,
             position_au=(position[0], position[1], position[2]),
@@ -1489,9 +1444,7 @@ class ProgrammaticObserverV1:
         return positions
 
 
-_OBSERVER_CACHE: OrderedDict[tuple[str, str | None, int], ObserverStateProvider] = (
-    OrderedDict()
-)
+_OBSERVER_CACHE: OrderedDict[tuple[str, str | None, int], ObserverStateProvider] = OrderedDict()
 _OBSERVER_CACHE_MAX = 16
 
 _OBSERVER_FAMILIES: dict[ObserverKind, type] = {
@@ -1522,9 +1475,7 @@ def resolve_observer_state_provider(
     if provider is not None:
         _OBSERVER_CACHE.move_to_end(key)
         return provider
-    built: ObserverStateProvider = _OBSERVER_FAMILIES[observer.kind](
-        observer, ephemeris
-    )
+    built: ObserverStateProvider = _OBSERVER_FAMILIES[observer.kind](observer, ephemeris)
     provider = built
     _OBSERVER_CACHE[key] = provider
     if len(_OBSERVER_CACHE) > _OBSERVER_CACHE_MAX:

@@ -178,9 +178,7 @@ def _accel_target() -> Target:
     )
 
 
-@pytest.mark.parametrize(
-    "target_factory", [make_target, _accel_target, _orbit_target]
-)
+@pytest.mark.parametrize("target_factory", [make_target, _accel_target, _orbit_target])
 def test_vectorized_states_match_scalar(target_factory) -> None:
     clear_provider_cache()
     provider = resolve_target_state_provider(target_factory())
@@ -226,9 +224,7 @@ def test_chunks_reassemble_the_batch_result_exactly() -> None:
     assert [chunk.chunk_index for chunk in chunks] == list(range(len(chunks)))
     assert all(chunk.chunk_count == len(chunks) for chunk in chunks)
     assert tuple(chunk.corridor for chunk in chunks) == batch.corridors
-    reassembled = tuple(
-        sample for chunk in chunks for sample in chunk.corridor.samples
-    )
+    reassembled = tuple(sample for chunk in chunks for sample in chunk.corridor.samples)
     assert reassembled == batch.samples
     assert chunks[0].corridor.calculation_id == batch.calculation_id
 
@@ -236,36 +232,22 @@ def test_chunks_reassemble_the_batch_result_exactly() -> None:
 def test_chunk_ranges_are_independently_reproducible() -> None:
     request = make_request()
     full = list(iter_locus_chunks(request, REGISTRY, ephemeris=EPHEMERIS))
-    partial = list(
-        iter_locus_chunks(request, REGISTRY, ephemeris=EPHEMERIS, start=1, stop=3)
-    )
+    partial = list(iter_locus_chunks(request, REGISTRY, ephemeris=EPHEMERIS, start=1, stop=3))
     assert [chunk.chunk_index for chunk in partial] == [1, 2]
-    assert [chunk.corridor for chunk in partial] == [
-        chunk.corridor for chunk in full[1:3]
-    ]
+    assert [chunk.corridor for chunk in partial] == [chunk.corridor for chunk in full[1:3]]
 
 
 def test_plan_reuse_and_validation() -> None:
     request = make_request()
     plan = plan_calculation(request, REGISTRY, ephemeris=EPHEMERIS)
     assert plan.chunk_count == 1 * 2 * 2  # targets x roles x epochs
-    chunks = list(
-        iter_locus_chunks(request, REGISTRY, plan=plan, ephemeris=EPHEMERIS)
-    )
+    chunks = list(iter_locus_chunks(request, REGISTRY, plan=plan, ephemeris=EPHEMERIS))
     assert len(chunks) == plan.chunk_count
     other_request = make_request(roles=(Role.RX,))
     with pytest.raises(GenerationError, match="different request"):
-        list(
-            iter_locus_chunks(
-                other_request, REGISTRY, plan=plan, ephemeris=EPHEMERIS
-            )
-        )
+        list(iter_locus_chunks(other_request, REGISTRY, plan=plan, ephemeris=EPHEMERIS))
     with pytest.raises(GenerationError, match="invalid chunk range"):
-        list(
-            iter_locus_chunks(
-                request, REGISTRY, ephemeris=EPHEMERIS, start=3, stop=1
-            )
-        )
+        list(iter_locus_chunks(request, REGISTRY, ephemeris=EPHEMERIS, start=3, stop=1))
 
 
 # ---------------------------------------------------------------------------
@@ -281,19 +263,14 @@ def test_streamed_csv_is_byte_identical_to_batch(tmp_path: Path) -> None:
 
     stream_dir = tmp_path / "stream"
     written = write_samples_stream(
-        (
-            chunk.corridor
-            for chunk in iter_locus_chunks(request, REGISTRY, ephemeris=EPHEMERIS)
-        ),
+        (chunk.corridor for chunk in iter_locus_chunks(request, REGISTRY, ephemeris=EPHEMERIS)),
         stream_dir,
         calculation_id=result.calculation_id,
         model_id=request.model_id,
         result_warnings=result.warnings,
         rows_per_ecsv_part=7,  # force multiple parts
     )
-    assert (stream_dir / "samples.csv").read_bytes() == (
-        batch_dir / "samples.csv"
-    ).read_bytes()
+    assert (stream_dir / "samples.csv").read_bytes() == (batch_dir / "samples.csv").read_bytes()
     # corridors.ecsv carries the same rows and metadata as the batch file.
     assert (stream_dir / "corridors.ecsv").read_bytes() == (
         batch_dir / "corridors.ecsv"
@@ -308,9 +285,7 @@ def test_streamed_csv_is_byte_identical_to_batch(tmp_path: Path) -> None:
     batch_table = Table.read(batch_dir / "samples.ecsv", format="ascii.ecsv")
     streamed_rows = 0
     sample_ids: list[str] = []
-    for offset_expected, path in zip(
-        range(0, len(batch_table), 7), part_paths, strict=True
-    ):
+    for offset_expected, path in zip(range(0, len(batch_table), 7), part_paths, strict=True):
         part = Table.read(path, format="ascii.ecsv")
         assert part.meta["calculation_id"] == result.calculation_id
         assert part.meta["part_row_offset"] == offset_expected

@@ -14,9 +14,7 @@ from support import EXAMPLES_DIR
 
 from sglseti.cli import main
 
-KERNEL = Path(__file__).resolve().parents[1] / "data" / "kernels" / (
-    "de440s_excerpt_2010-2035.bsp"
-)
+KERNEL = Path(__file__).resolve().parents[1] / "data" / "kernels" / ("de440s_excerpt_2010-2035.bsp")
 
 
 def test_generate_cli_matches_direct_api(tmp_path: Path, capsys) -> None:
@@ -60,9 +58,7 @@ def test_generate_cli_matches_direct_api(tmp_path: Path, capsys) -> None:
         cli_manifest["science_inputs"]["calculation_id"]
         == api_manifest["science_inputs"]["calculation_id"]
     )
-    assert cli_manifest["science_inputs"]["request"] == (
-        api_manifest["science_inputs"]["request"]
-    )
+    assert cli_manifest["science_inputs"]["request"] == (api_manifest["science_inputs"]["request"])
     assert set(cli_manifest["science_inputs"]["input_file_hashes"]) == {
         "targets_yaml",
         "request_yaml",
@@ -99,9 +95,7 @@ def test_products_consumable_with_stdlib_and_astropy_only(tmp_path: Path) -> Non
 
 def test_generate_epochs_override(tmp_path: Path, capsys) -> None:
     epochs = tmp_path / "override.csv"
-    epochs.write_text(
-        "epoch_id,time_utc\ncustom-1,2020-05-05T05:00:00Z\n", encoding="utf-8"
-    )
+    epochs.write_text("epoch_id,time_utc\ncustom-1,2020-05-05T05:00:00Z\n", encoding="utf-8")
     code = main(
         [
             "generate",
@@ -117,9 +111,7 @@ def test_generate_epochs_override(tmp_path: Path, capsys) -> None:
     )
     assert code == 0
     assert "samples: 50 (0 invalid)" in capsys.readouterr().out  # 2 roles x 25
-    manifest = json.loads(
-        (tmp_path / "out" / "manifest.json").read_text(encoding="utf-8")
-    )
+    manifest = json.loads((tmp_path / "out" / "manifest.json").read_text(encoding="utf-8"))
     assert "epochs_table" in manifest["science_inputs"]["input_file_hashes"]
 
 
@@ -163,9 +155,7 @@ ephemeris:
     assert "samples: 2 (2 invalid)" in captured.out
     assert "invalid_sample_count:2" in captured.err
     # Products were still written, with explicit invalid rows.
-    document = json.loads(
-        (tmp_path / "out" / "result.json").read_text(encoding="utf-8")
-    )
+    document = json.loads((tmp_path / "out" / "result.json").read_text(encoding="utf-8"))
     assert all(s["validity"] == "invalid" for s in document["samples"])
 
     # Strict mode refuses instead.
@@ -241,9 +231,7 @@ fov:
     assert "visibility: 3" in output
     assert (tmp_path / "out" / "visibility.ecsv").is_file()
     assert (tmp_path / "out" / "manifest.json").is_file()
-    document = json.loads(
-        (tmp_path / "out" / "result.json").read_text(encoding="utf-8")
-    )
+    document = json.loads((tmp_path / "out" / "result.json").read_text(encoding="utf-8"))
     assert len(document["visibility"]) == 3
     if document["pointings"]:
         assert (tmp_path / "out" / "pointings.ecsv").is_file()

@@ -119,9 +119,7 @@ def test_pointing_samples_come_from_representative_corridor(context) -> None:
             for (target, role, epoch_id) in corridors
             if target == pointing.target_id and role == pointing.role
         ]
-        assert any(
-            set(pointing.sample_ids) <= corridors[key] for key in window_epochs
-        )
+        assert any(set(pointing.sample_ids) <= corridors[key] for key in window_epochs)
 
 
 def test_planning_is_stateless_and_pure(context) -> None:
@@ -157,9 +155,7 @@ def test_planning_requires_observability_and_fov(context) -> None:
         plan_commensal(without_observability, registry)
     without_fov = dataclasses.replace(
         generated,
-        request=dataclasses.replace(
-            request, fov=None
-        ),
+        request=dataclasses.replace(request, fov=None),
     )
     with pytest.raises(PlanningError, match="fov"):
         plan_commensal(without_fov, registry)

@@ -47,9 +47,7 @@ class TestEcsv:
         assert table.meta["calculation_id"] == result.calculation_id
         assert table.meta["result_schema_version"] == RESULT_SCHEMA_VERSION
         # Values survive the round trip.
-        assert float(table["icrs_ra_deg"][0]) == pytest.approx(
-            result.samples[0].icrs_ra_deg
-        )
+        assert float(table["icrs_ra_deg"][0]) == pytest.approx(result.samples[0].icrs_ra_deg)
         assert str(table["epoch_id"][0]) == result.samples[0].epoch_id
 
     def test_corridor_table_references_samples(self, result, tmp_path: Path) -> None:
@@ -110,20 +108,14 @@ class TestJson:
 class TestCsv:
     def test_stable_header_and_determinism(self, result, tmp_path: Path) -> None:
         written = write(result, tmp_path / "a")
-        header = (
-            written["samples_csv"].read_text(encoding="utf-8").splitlines()[0]
-        )
+        header = written["samples_csv"].read_text(encoding="utf-8").splitlines()[0]
         assert header == ",".join(SAMPLE_COLUMNS)
         again = write(result, tmp_path / "b")
-        assert (
-            written["samples_csv"].read_bytes() == again["samples_csv"].read_bytes()
-        )
+        assert written["samples_csv"].read_bytes() == again["samples_csv"].read_bytes()
 
     def test_pointings_csv_when_planned(self, planned_result, tmp_path: Path) -> None:
         written = write(planned_result, tmp_path)
-        header = (
-            written["pointings_csv"].read_text(encoding="utf-8").splitlines()[0]
-        )
+        header = written["pointings_csv"].read_text(encoding="utf-8").splitlines()[0]
         assert header == ",".join(POINTING_COLUMNS)
         # None fields (e.g. propagated width) serialize as empty cells.
         rows = written["pointings_csv"].read_text(encoding="utf-8").splitlines()[1:]
@@ -143,13 +135,9 @@ class TestDs9:
         circles = [line for line in lines if circle.match(line)]
         polyline = re.compile(r"^line\(-?[\d.]+,-?[\d.]+,-?[\d.]+,-?[\d.]+\) # ")
         segments = [line for line in lines if polyline.match(line)]
-        valid_samples = [
-            s for s in planned_result.samples if math.isfinite(s.icrs_ra_deg)
-        ]
+        valid_samples = [s for s in planned_result.samples if math.isfinite(s.icrs_ra_deg)]
         assert len(circles) == len(valid_samples) + len(planned_result.pointings)
-        expected_segments = sum(
-            max(0, len(c.samples) - 1) for c in planned_result.corridors
-        )
+        expected_segments = sum(max(0, len(c.samples) - 1) for c in planned_result.corridors)
         assert len(segments) == expected_segments
 
     def test_invalid_samples_omitted_and_counted(self, tmp_path: Path) -> None:
@@ -170,22 +158,16 @@ class TestDs9:
 
 
 class TestManifest:
-    def test_science_hash_independent_of_run_circumstance(
-        self, result, tmp_path: Path
-    ) -> None:
+    def test_science_hash_independent_of_run_circumstance(self, result, tmp_path: Path) -> None:
         first = write(result, tmp_path / "a")
-        second = write_products(
-            result, tmp_path / "b", generated_utc="2030-01-01T00:00:00+00:00"
-        )
+        second = write_products(result, tmp_path / "b", generated_utc="2030-01-01T00:00:00+00:00")
         manifest_a = json.loads(first["manifest_json"].read_text(encoding="utf-8"))
         manifest_b = json.loads(second["manifest_json"].read_text(encoding="utf-8"))
         assert manifest_a["science_input_hash"] == manifest_b["science_input_hash"]
         assert manifest_a["run"]["generated_utc"] != manifest_b["run"]["generated_utc"]
 
     def test_output_files_cross_reference(self, result, tmp_path: Path) -> None:
-        written = write(
-            result, tmp_path, input_file_hashes={"targets_yaml": "sha256:abc"}
-        )
+        written = write(result, tmp_path, input_file_hashes={"targets_yaml": "sha256:abc"})
         manifest = json.loads(written["manifest_json"].read_text(encoding="utf-8"))
         for label, checksum in manifest["run"]["output_files"].items():
             assert file_sha256(written[label]) == checksum
@@ -194,9 +176,7 @@ class TestManifest:
         assert science["input_file_hashes"] == {"targets_yaml": "sha256:abc"}
         assert science["calculation_id"] == result.calculation_id
         assert science["ephemeris_ids"] == ["fake_fixture_ephemeris"]
-        assert science["conventions"]["catalog_epoch_semantics"] == (
-            "ssb_light_arrival_time"
-        )
+        assert science["conventions"]["catalog_epoch_semantics"] == ("ssb_light_arrival_time")
         assert "sglseti" in manifest["run"]["versions"]
 
 

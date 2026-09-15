@@ -173,9 +173,7 @@ class TestStaticSynthetic:
         for role in Role:
             solution = solve_static(static_fixture, role)
             assert (
-                epoch_diff_days(
-                    solution.direction.catalog_direction_epoch, expected[role.value]
-                )
+                epoch_diff_days(solution.direction.catalog_direction_epoch, expected[role.value])
                 < tol
             )
 
@@ -203,9 +201,7 @@ class TestConstantVelocitySynthetic:
     """
 
     @pytest.mark.parametrize("role", list(Role))
-    def test_directions_match_physical_oracle(
-        self, cv_fixture: dict[str, Any], role: Role
-    ) -> None:
+    def test_directions_match_physical_oracle(self, cv_fixture: dict[str, Any], role: Role) -> None:
         expected = cv_fixture["expected"][role.value]
         tol = cv_fixture["tolerance"]["direction_arcsec"]
         solution = solve_cv(cv_fixture, role)
@@ -220,9 +216,7 @@ class TestConstantVelocitySynthetic:
         assert los_sep_arcsec(solution, expected["los_ra_deg"], expected["los_dec_deg"]) < tol
 
     @pytest.mark.parametrize("role", list(Role))
-    def test_catalog_and_physical_epochs(
-        self, cv_fixture: dict[str, Any], role: Role
-    ) -> None:
+    def test_catalog_and_physical_epochs(self, cv_fixture: dict[str, Any], role: Role) -> None:
         expected = cv_fixture["expected"][role.value]
         solution = solve_cv(cv_fixture, role)
         # tx's catalog epoch depends on the declared d; ERFA's light-time
@@ -273,17 +267,13 @@ class TestConstantVelocitySynthetic:
         assert math.isclose(
             rx_offset, abs(sanity["rx_minus_antipode_target_dir_arcsec"]), rel_tol=0.01
         )
-        assert math.isclose(
-            tx_offset, sanity["tx_minus_antipode_target_dir_arcsec"], rel_tol=0.01
-        )
+        assert math.isclose(tx_offset, sanity["tx_minus_antipode_target_dir_arcsec"], rel_tol=0.01)
 
 
 class TestDoubleRetardedNegative:
     """The double-retarded Rx construction must be DETECTED, never matched."""
 
-    def test_engine_rx_is_far_from_wrong_construction(
-        self, cv_fixture: dict[str, Any]
-    ) -> None:
+    def test_engine_rx_is_far_from_wrong_construction(self, cv_fixture: dict[str, Any]) -> None:
         negative = load_reference_fixture("double_retarded_negative.yaml")
         solution = solve_cv(cv_fixture, Role.RX)
         wrong = negative["wrong_construction"]
@@ -327,9 +317,7 @@ def barnard_direction(target: Target, role: Role, z_au: float) -> DirectionSolut
 class TestBarnardScaleCheck:
     """High-proper-motion Rx/Tx offset scale and sign."""
 
-    def test_rx_offsets_scale(
-        self, barnard_fixture: dict[str, Any], barnard: Target
-    ) -> None:
+    def test_rx_offsets_scale(self, barnard_fixture: dict[str, Any], barnard: Target) -> None:
         tol_fraction = barnard_fixture["tolerance"]["offset_fraction"]
         antipode = barnard_direction(barnard, Role.ANTIPODE, 550.0)
         for z_au, key in ((550.0, "z_550_au"), (2500.0, "z_2500_au")):
@@ -473,9 +461,7 @@ class TestAlphaCenPublishedEpoch:
         assert abs(solution.los_icrs_ra_deg - 39.85) < tol_deg * 2.0
         assert abs(solution.los_icrs_dec_deg - 60.90) < tol_deg
 
-    def test_rho_matches_reference(
-        self, acen_fixture: dict[str, Any], acen_context: tuple
-    ) -> None:
+    def test_rho_matches_reference(self, acen_fixture: dict[str, Any], acen_context: tuple) -> None:
         target, observer, t_o, ephemeris = acen_context
         solution = compute_relay_solution(
             target=target,
@@ -511,14 +497,9 @@ class TestAlphaCenPublishedEpoch:
             model=MODEL,
             step_s=15.0,
         )
-        magnitude = math.hypot(
-            coarse.rate_ra_cosdec_arcsec_per_hr, coarse.rate_dec_arcsec_per_hr
-        )
+        magnitude = math.hypot(coarse.rate_ra_cosdec_arcsec_per_hr, coarse.rate_dec_arcsec_per_hr)
         # Relay parallax motion from Earth's orbit: ~0.05-1 arcsec/hr scale.
         assert 0.01 < magnitude < 5.0
-        assert (
-            abs(coarse.rate_ra_cosdec_arcsec_per_hr - fine.rate_ra_cosdec_arcsec_per_hr)
-            < 0.01
-        )
+        assert abs(coarse.rate_ra_cosdec_arcsec_per_hr - fine.rate_ra_cosdec_arcsec_per_hr) < 0.01
         assert abs(coarse.rate_dec_arcsec_per_hr - fine.rate_dec_arcsec_per_hr) < 0.01
         assert coarse.step_s == 60.0 and fine.step_s == 15.0

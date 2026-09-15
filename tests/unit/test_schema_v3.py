@@ -231,9 +231,7 @@ def test_request_yaml_intervals_mode(tmp_path: Path) -> None:
 
 def test_votable_products(tmp_path: Path) -> None:
     clear_provider_cache()
-    request = make_request(
-        output_formats=(OutputFormat.ECSV, OutputFormat.VOTABLE)
-    )
+    request = make_request(output_formats=(OutputFormat.ECSV, OutputFormat.VOTABLE))
     result = generate_loci(request, REGISTRY, ephemeris=EPHEMERIS)
     written = write_products(result, tmp_path, generated_utc="2026-08-18T00:00:00Z")
     votable = Table.read(written["samples_votable"], format="votable")
@@ -261,9 +259,7 @@ def test_votable_products(tmp_path: Path) -> None:
 
 def test_manifest_extensions() -> None:
     clear_provider_cache()
-    result = generate_loci(
-        make_request(time=interval_spec()), REGISTRY, ephemeris=EPHEMERIS
-    )
+    result = generate_loci(make_request(time=interval_spec()), REGISTRY, ephemeris=EPHEMERIS)
     manifest = result_manifest(
         result,
         generated_utc="2026-08-18T00:00:00Z",
@@ -276,10 +272,7 @@ def test_manifest_extensions() -> None:
     providers = science["target_state_providers"]
     assert providers["synth"]["provider_id"] == "linear_astrometry_v1"
     assert providers["synth"]["content_hash"].startswith("sha256:")
-    assert (
-        science["observer_state_providers"]["earth-center"]["provider_id"]
-        == "earth_center_v1"
-    )
+    assert science["observer_state_providers"]["earth-center"]["provider_id"] == "earth_center_v1"
     assert science["uncertainty"]["method"] == "not_propagated"
     assert "observation_intervals" in science["time_semantics"]
     run = manifest["run"]

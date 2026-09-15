@@ -144,9 +144,7 @@ _ASTROMETRY_FIELDS = frozenset(
         "radial_velocity_km_s",
     }
 )
-_ACCELERATION_FIELDS = frozenset(
-    {"accel_ra_cosdec_mas_per_yr2", "accel_dec_mas_per_yr2"}
-)
+_ACCELERATION_FIELDS = frozenset({"accel_ra_cosdec_mas_per_yr2", "accel_dec_mas_per_yr2"})
 _CIRCULAR_ORBIT_ANGLES = frozenset({"ascending_node_deg", "arg_periastron_deg"})
 
 _MAS_PER_DEG = 3.6e6
@@ -252,9 +250,7 @@ def target_uncertainty(target: Target) -> TargetUncertainty:
             for index, name in enumerate(spec.parameters):
                 if name in sigmas:
                     diagonal_sigma = math.sqrt(spec.matrix[index][index])
-                    if not math.isclose(
-                        diagonal_sigma, sigmas[name], rel_tol=1e-6, abs_tol=0.0
-                    ):
+                    if not math.isclose(diagonal_sigma, sigmas[name], rel_tol=1e-6, abs_tol=0.0):
                         raise GenerationError(
                             f"target {target.target_id!r}: {name!r} declares "
                             f"sigma {sigmas[name]} in provenance but "
@@ -270,9 +266,7 @@ def target_uncertainty(target: Target) -> TargetUncertainty:
                 )
             for i, name_i in enumerate(spec.parameters):
                 for j, name_j in enumerate(spec.parameters):
-                    matrix[i, j] = (
-                        spec.matrix[i][j] * sigmas[name_i] * sigmas[name_j]
-                    )
+                    matrix[i, j] = spec.matrix[i][j] * sigmas[name_i] * sigmas[name_j]
     for index, name in enumerate(ordered):
         if matrix[index, index] == 0.0:
             matrix[index, index] = sigmas[name] ** 2
@@ -292,9 +286,7 @@ def target_uncertainty(target: Target) -> TargetUncertainty:
     )
 
 
-def _apply_offsets(
-    target: Target, parameters: tuple[str, ...], deltas: np.ndarray
-) -> Target:
+def _apply_offsets(target: Target, parameters: tuple[str, ...], deltas: np.ndarray) -> Target:
     """One perturbed target; raises ValueError when a draw leaves a domain."""
     astrometry_updates: dict[str, Any] = {}
     orbit_updates: dict[str, Any] = {}
@@ -304,9 +296,7 @@ def _apply_offsets(
         delta = float(delta_raw)
         if name == "ra_deg":
             cos_dec = math.cos(math.radians(state.dec_deg))
-            astrometry_updates["ra_deg"] = (
-                state.ra_deg + delta / (_MAS_PER_DEG * cos_dec)
-            ) % 360.0
+            astrometry_updates["ra_deg"] = (state.ra_deg + delta / (_MAS_PER_DEG * cos_dec)) % 360.0
         elif name == "dec_deg":
             astrometry_updates["dec_deg"] = state.dec_deg + delta / _MAS_PER_DEG
         elif name in _ASTROMETRY_FIELDS:
@@ -343,15 +333,11 @@ def _apply_offsets(
         updates["orbit"] = dataclasses.replace(target.orbit, **orbit_updates)
     if acceleration_updates:
         assert target.acceleration is not None
-        updates["acceleration"] = dataclasses.replace(
-            target.acceleration, **acceleration_updates
-        )
+        updates["acceleration"] = dataclasses.replace(target.acceleration, **acceleration_updates)
     return dataclasses.replace(target, **updates)
 
 
-def draw_target_samples(
-    target: Target, *, count: int, seed: int
-) -> tuple[Target, ...]:
+def draw_target_samples(target: Target, *, count: int, seed: int) -> tuple[Target, ...]:
     """Draw ``count`` perturbed, fully validated targets.
 
     Deterministic for a given ``seed`` (recorded on every propagated
@@ -431,9 +417,7 @@ class LocusUncertainty:
 
     def __post_init__(self) -> None:
         if not 0.0 < self.confidence_level < 1.0:
-            raise ValueError(
-                f"confidence_level must be within (0, 1), got {self.confidence_level}"
-            )
+            raise ValueError(f"confidence_level must be within (0, 1), got {self.confidence_level}")
         if len(self.offsets_arcsec) != self.sample_count:
             raise ValueError("offsets_arcsec must carry one entry per sample")
 
@@ -443,9 +427,7 @@ def _east_north_basis(vec: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     ra = math.atan2(y, x)
     east = np.array([-math.sin(ra), math.cos(ra), 0.0])
     horizontal = math.hypot(x, y)
-    north = np.array(
-        [-z * math.cos(ra), -z * math.sin(ra), horizontal]
-    )
+    north = np.array([-z * math.cos(ra), -z * math.sin(ra), horizontal])
     north /= np.linalg.norm(north)
     return east, north
 
@@ -546,9 +528,7 @@ def propagate_locus_uncertainty(
         for factor in (1.01, 0.99)
     ]
     tangent_pair = [
-        _tangent_offset_arcsec(
-            _unit(p.icrs_ra_deg, p.icrs_dec_deg), nominal_vec, east, north
-        )
+        _tangent_offset_arcsec(_unit(p.icrs_ra_deg, p.icrs_dec_deg), nominal_vec, east, north)
         for p in step_points
     ]
     tangent = np.array(tangent_pair[1]) - np.array(tangent_pair[0])
@@ -656,9 +636,7 @@ class CrossingUncertainty:
 
     def __post_init__(self) -> None:
         if not 0.0 < self.confidence_level < 1.0:
-            raise ValueError(
-                f"confidence_level must be within (0, 1), got {self.confidence_level}"
-            )
+            raise ValueError(f"confidence_level must be within (0, 1), got {self.confidence_level}")
         if len(self.b_min_samples_au) != self.sample_count:
             raise ValueError("b_min_samples_au must carry one entry per sample")
 
@@ -771,9 +749,7 @@ def crossing_uncertainty(
     lower_q = (1.0 - confidence_level) / 2.0
     upper_q = 1.0 - lower_q
     side_fraction = (
-        float(np.mean([side is event.side for side in sides]))
-        if event.side is not None
-        else 0.0
+        float(np.mean([side is event.side for side in sides])) if event.side is not None else 0.0
     )
 
     warnings: list[str] = []

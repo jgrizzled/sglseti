@@ -147,9 +147,7 @@ def make_request(
 
 def run(request: CrossingsRequest, target: Target, **kwargs: object):
     registry = TargetRegistry.from_targets((target,))
-    return find_crossings(
-        request, registry, ephemeris=CircularOrbitEphemeris(), **kwargs
-    )
+    return find_crossings(request, registry, ephemeris=CircularOrbitEphemeris(), **kwargs)
 
 
 class TestInPlaneTarget:
@@ -198,9 +196,7 @@ class TestInPlaneTarget:
         first = run(make_request(), make_target())
         second = run(make_request(), make_target())
         assert first.crossings_id == second.crossings_id
-        assert [e.event_id for e in first.events] == [
-            e.event_id for e in second.events
-        ]
+        assert [e.event_id for e in first.events] == [e.event_id for e in second.events]
         assert len({e.event_id for e in first.events}) == len(first.events)
 
     def test_boundary_minimum_is_truncated_and_degraded(self) -> None:
@@ -219,9 +215,7 @@ class TestInPlaneTarget:
         assert window.truncated_ingress
         assert not window.truncated_egress
         assert window.ingress_tdb_jd == pytest.approx(JD0)
-        assert window.duration_days == pytest.approx(
-            math.asin(0.2) / OMEGA, rel=0.01
-        )
+        assert window.duration_days == pytest.approx(math.asin(0.2) / OMEGA, rel=0.01)
 
 
 class TestInclinedTarget:
@@ -243,15 +237,11 @@ class TestLinkDirections:
         # (apparent) axis by tens of arcseconds.
         target = make_target(pm_ra_cosdec=1000.0, distance_pc=5.0)
         result = run(
-            make_request(
-                directions=(LinkDirection.INBOUND, LinkDirection.OUTBOUND)
-            ),
+            make_request(directions=(LinkDirection.INBOUND, LinkDirection.OUTBOUND)),
             target,
         )
         inbound = [e for e in result.events if e.link_direction is LinkDirection.INBOUND]
-        outbound = [
-            e for e in result.events if e.link_direction is LinkDirection.OUTBOUND
-        ]
+        outbound = [e for e in result.events if e.link_direction is LinkDirection.OUTBOUND]
         assert len(inbound) == 2 and len(outbound) == 2
         assert all(e.role is Role.ANTIPODE for e in inbound)
         assert all(e.role is Role.TX for e in outbound)
@@ -260,8 +250,7 @@ class TestLinkDirections:
         offset = outbound[0].axis_icrs_ra_deg - inbound[0].axis_icrs_ra_deg
         assert offset == pytest.approx(expected_offset_deg, rel=0.05)
         assert (
-            outbound[0].catalog_direction_epoch_tdb_jd
-            > inbound[0].catalog_direction_epoch_tdb_jd
+            outbound[0].catalog_direction_epoch_tdb_jd > inbound[0].catalog_direction_epoch_tdb_jd
         )
 
 
@@ -310,9 +299,7 @@ class TestQualityAndFailure:
             model_id=request.model_id,
         )
         with pytest.raises(GenerationError, match="unknown target"):
-            find_crossings(
-                request, registry, ephemeris=CircularOrbitEphemeris()
-            )
+            find_crossings(request, registry, ephemeris=CircularOrbitEphemeris())
 
 
 class TestImpactParameterPointApi:

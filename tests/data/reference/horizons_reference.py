@@ -112,16 +112,12 @@ def fetch_sun_astrometric(center: str, extra: dict[str, str]) -> list[dict[str, 
     params.update(extra)
     block = query(params)
     rows = []
-    for jd, line in zip(
-        EPOCH_JDS, [ln for ln in block.splitlines() if ln.strip()], strict=True
-    ):
+    for jd, line in zip(EPOCH_JDS, [ln for ln in block.splitlines() if ln.strip()], strict=True):
         cells = [cell.strip() for cell in line.split(",")]
         # CSV observer rows: date, [flags...], RA, Dec — RA/Dec are the last
         # two non-empty numeric cells.
         numeric = [c for c in cells[1:] if re.fullmatch(r"[-+0-9.]+", c)]
-        rows.append(
-            {"ut_jd": jd, "ra_deg": float(numeric[-2]), "dec_deg": float(numeric[-1])}
-        )
+        rows.append({"ut_jd": jd, "ra_deg": float(numeric[-2]), "dec_deg": float(numeric[-1])})
     return rows
 
 

@@ -98,8 +98,7 @@ def fetch_kernel(
         pinned = info.sha256
         if expected_sha256 is not None and expected_sha256 != pinned:
             raise EphemerisError(
-                f"--expected-sha256 conflicts with the pinned checksum for "
-                f"{kernel!r} ({pinned})"
+                f"--expected-sha256 conflicts with the pinned checksum for {kernel!r} ({pinned})"
             )
     else:
         assert url is not None
@@ -109,9 +108,7 @@ def fetch_kernel(
     return _download_atomic(source_url, output_dir, pinned=pinned)
 
 
-def _download_atomic(
-    source_url: str, output_dir: str | Path, *, pinned: str | None
-) -> FetchResult:
+def _download_atomic(source_url: str, output_dir: str | Path, *, pinned: str | None) -> FetchResult:
     """Atomic checksum-verified download shared by all resource fetchers."""
     filename = Path(urllib.parse.urlparse(source_url).path).name
     if not filename:
@@ -123,9 +120,12 @@ def _download_atomic(
 
     digest = hashlib.sha256()
     try:
-        with urllib.request.urlopen(  # noqa: S310 — explicit user-invoked fetch
-            source_url, timeout=_DOWNLOAD_TIMEOUT_S
-        ) as response, partial.open("wb") as sink:
+        with (
+            urllib.request.urlopen(  # noqa: S310 — explicit user-invoked fetch
+                source_url, timeout=_DOWNLOAD_TIMEOUT_S
+            ) as response,
+            partial.open("wb") as sink,
+        ):
             while chunk := response.read(_CHUNK_BYTES):
                 digest.update(chunk)
                 sink.write(chunk)

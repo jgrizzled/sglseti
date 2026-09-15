@@ -95,9 +95,7 @@ class TestWindows:
     def windows(self, pattern: list[bool]):
         epochs = make_grid(len(pattern))
         visibility = tuple(vis(e, p) for e, p in zip(epochs, pattern, strict=True))
-        return find_windows(
-            target_id="synth", role=Role.RX, epochs=epochs, visibility=visibility
-        )
+        return find_windows(target_id="synth", role=Role.RX, epochs=epochs, visibility=visibility)
 
     def test_single_window_with_representative_midpoint(self) -> None:
         (window,) = self.windows([True, True, True, True, True])

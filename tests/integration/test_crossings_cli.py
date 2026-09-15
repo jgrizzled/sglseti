@@ -115,10 +115,6 @@ def test_events_are_real_local_minima(request_path: Path) -> None:
         assert center <= b_at(t_ca + day)
 
     # Consecutive same-side minima are one orbital period apart.
-    target_side = sorted(
-        e.t_ca_tdb_jd for e in interior if e.side.value == "target"
-    )
+    target_side = sorted(e.t_ca_tdb_jd for e in interior if e.side.value == "target")
     if len(target_side) >= 2:
-        assert math.isclose(
-            target_side[1] - target_side[0], 365.25, abs_tol=5.0
-        )
+        assert math.isclose(target_side[1] - target_side[0], 365.25, abs_tol=5.0)

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1]
+
+### Fixed
+
+- Offline IERS policy no longer crashes on a stale bundled table.
+  `offline_resources` disables astropy's auto-download, but astropy's
+  separate `auto_max_age` check still raised `ValueError` for any epoch
+  beyond the bundled table's predictive range once that table was more
+  than 30 days old — so every install (and CI) started failing on
+  future-epoch AltAz/site products about a month after the pinned
+  `astropy-iers-data` release. The policy now lifts `auto_max_age` inside
+  the context; coverage degradation continues to surface as captured
+  `astropy:` warnings with `degraded` validity. Regression tests cover
+  the policy and a simulated stale table.
+
 ## [1.1.0]
 
 ### Changed

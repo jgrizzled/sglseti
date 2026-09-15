@@ -65,12 +65,16 @@ def test_valid_request_round_trip(tmp_path: Path) -> None:
 
 def test_defaults_without_optional_blocks(tmp_path: Path) -> None:
     optional = (
-        "beam", "scan", "products",
-        "  radii", "  report", "  coarse", "  refine", "  formats",
+        "beam",
+        "scan",
+        "products",
+        "  radii",
+        "  report",
+        "  coarse",
+        "  refine",
+        "  formats",
     )
-    text = "\n".join(
-        line for line in VALID.splitlines() if not line.startswith(optional)
-    )
+    text = "\n".join(line for line in VALID.splitlines() if not line.startswith(optional))
     request = load_crossings_request(write_request(tmp_path, text))
     assert request.beam_radii_au == ()
     assert request.report_max_b_au is None
@@ -117,9 +121,7 @@ def test_invalid_values_rejected(
 ) -> None:
     assert original in VALID
     with pytest.raises(ConfigError, match=message):
-        load_crossings_request(
-            write_request(tmp_path, VALID.replace(original, replacement))
-        )
+        load_crossings_request(write_request(tmp_path, VALID.replace(original, replacement)))
 
 
 def test_unknown_top_level_key_rejected(tmp_path: Path) -> None:

@@ -32,6 +32,7 @@ input `epoch_id`, so joining back to your archive query loses nothing:
 
 ```python
 from astropy.table import Table
+
 samples = Table.read("build/archive-targets/samples.ecsv", format="ascii.ecsv")
 mine = samples[samples["epoch_id"] == "archive-exposure-3"]
 ```
@@ -99,7 +100,13 @@ print(sample.b_au, sample.side)
 ## The same thing from Python
 
 ```python
-from sglseti import generate_loci, load_request, load_target_registry, plan_commensal, write_products
+from sglseti import (
+    generate_loci,
+    load_request,
+    load_target_registry,
+    plan_commensal,
+    write_products,
+)
 
 registry = load_target_registry("examples/targets.yaml")
 request = load_request("examples/commensal-night.yaml")
@@ -162,16 +169,26 @@ learns archive footprint schemas — into covered relay-distance intervals:
 from sglseti import RelayRange, Role, adaptive_locus, covered_z_intervals
 
 locus = adaptive_locus(
-    target=registry["barnard"], role=Role.RX, observation_time=t,
-    observer=observer, relay_range=RelayRange(550.0, 2500.0),
-    tolerance_arcsec=0.5, ephemeris=ephemeris, model=model,
+    target=registry["barnard"],
+    role=Role.RX,
+    observation_time=t,
+    observer=observer,
+    relay_range=RelayRange(550.0, 2500.0),
+    tolerance_arcsec=0.5,
+    ephemeris=ephemeris,
+    model=model,
 )
 covered = covered_z_intervals(
-    target=registry["barnard"], role=Role.RX, observation_time=t,
-    observer=observer, relay_range=RelayRange(550.0, 2500.0),
-    contains=my_footprint.contains_radec,     # your WCS/footprint logic
-    tolerance_arcsec=0.5, seed_step_arcsec=30.0,
-    ephemeris=ephemeris, model=model,
+    target=registry["barnard"],
+    role=Role.RX,
+    observation_time=t,
+    observer=observer,
+    relay_range=RelayRange(550.0, 2500.0),
+    contains=my_footprint.contains_radec,  # your WCS/footprint logic
+    tolerance_arcsec=0.5,
+    seed_step_arcsec=30.0,
+    ephemeris=ephemeris,
+    model=model,
 )
 ```
 
@@ -190,14 +207,25 @@ propagated confidence region always distinct from an assumed search pad:
 from sglseti import crossing_uncertainty, propagate_locus_uncertainty
 
 sky = propagate_locus_uncertainty(
-    target=target, role=Role.RX, observation_time=t, observer=observer,
-    z_au=800.0, ephemeris=ephemeris, model=model, seed=42, count=256,
+    target=target,
+    role=Role.RX,
+    observation_time=t,
+    observer=observer,
+    z_au=800.0,
+    ephemeris=ephemeris,
+    model=model,
+    seed=42,
+    count=256,
 )
 print(sky.confidence_radius_arcsec, sky.cross_track_sigma_arcsec)
 
-dist = crossing_uncertainty(          # b_min / t_ca / v_perp distributions
-    event=event, target=target, observer=observer,
-    ephemeris=ephemeris, model=model, seed=42,
+dist = crossing_uncertainty(  # b_min / t_ca / v_perp distributions
+    event=event,
+    target=target,
+    observer=observer,
+    ephemeris=ephemeris,
+    model=model,
+    seed=42,
 )
 print(dist.b_min_lower_au, dist.b_min_upper_au, dist.side_consistency_fraction)
 ```
@@ -237,7 +265,8 @@ from sglseti import iter_locus_chunks, plan_calculation, write_samples_stream
 plan = plan_calculation(request, registry)
 write_samples_stream(
     (chunk.corridor for chunk in iter_locus_chunks(request, registry, plan=plan)),
-    "build/survey", calculation_id=plan.calculation_id,
+    "build/survey",
+    calculation_id=plan.calculation_id,
     model_id=request.model_id,
 )
 ```

@@ -65,9 +65,7 @@ def test_single_segment_boundary() -> None:
 
 def test_reciprocal_step_count_and_bound() -> None:
     step_arcsec = 15.0
-    segments = barnard_rx(
-        SamplingSpec(kind=SamplingKind.RECIPROCAL_STEP, step_arcsec=step_arcsec)
-    )
+    segments = barnard_rx(SamplingSpec(kind=SamplingKind.RECIPROCAL_STEP, step_arcsec=step_arcsec))
     span = 1.0 / RANGE.z_min_au - 1.0 / RANGE.z_max_au
     step_q = step_arcsec / ARCSEC_PER_RADIAN
     assert len(segments) == max(1, math.ceil(span / step_q))
@@ -80,9 +78,7 @@ def test_reciprocal_step_count_and_bound() -> None:
 
 def test_explicit_distances_are_point_segments() -> None:
     distances = (550.0, 1000.0, 2500.0)
-    segments = barnard_rx(
-        SamplingSpec(kind=SamplingKind.EXPLICIT, distances_au=distances)
-    )
+    segments = barnard_rx(SamplingSpec(kind=SamplingKind.EXPLICIT, distances_au=distances))
     assert [segment.z_rep_au for segment in segments] == list(distances)
     for segment in segments:
         assert segment.is_point
@@ -112,9 +108,7 @@ def test_golden_identities() -> None:
     ],
 )
 def test_every_scientific_change_changes_identity(variant: dict) -> None:
-    base = dict(
-        target_id="barnard", role=Role.RX, relay_range=RANGE, sampling=COUNT_25
-    )
+    base = dict(target_id="barnard", role=Role.RX, relay_range=RANGE, sampling=COUNT_25)
     changed = generate_segments(**{**base, **variant})
     assert stable_hash(changed) != stable_hash(barnard_rx())
 
@@ -134,9 +128,7 @@ def test_unit_normalization_au_vs_km() -> None:
 
     in_au = RelayRange(550 * u.au, 2500 * u.au)
     in_km = RelayRange((550 * u.au).to(u.km), (2500 * u.au).to(u.km))
-    assert stable_hash(barnard_rx(relay_range=in_au)) == stable_hash(
-        barnard_rx(relay_range=in_km)
-    )
+    assert stable_hash(barnard_rx(relay_range=in_au)) == stable_hash(barnard_rx(relay_range=in_km))
 
 
 def test_segments_for_request_ordering() -> None:

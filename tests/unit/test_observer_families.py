@@ -71,9 +71,7 @@ def test_observer_kind_field_coherence() -> None:
     with pytest.raises(ValueError, match="requires a spice_target"):
         Observer(observer_id="x", kind=ObserverKind.SPACECRAFT_SPICE, path="a.bsp")
     with pytest.raises(ValueError, match="requires checksum_sha256"):
-        Observer(
-            observer_id="x", kind=ObserverKind.SPACECRAFT_TABLE, path="a.ecsv"
-        )
+        Observer(observer_id="x", kind=ObserverKind.SPACECRAFT_TABLE, path="a.ecsv")
     with pytest.raises(ValueError, match="caller-declared identity"):
         Observer(observer_id="x", kind=ObserverKind.PROGRAMMATIC)
     with pytest.raises(ValueError, match="does not take"):
@@ -99,9 +97,7 @@ def test_canonical_form_omits_defaults_and_paths(tmp_path: Path) -> None:
     }
     path = tmp_path / "craft.ecsv"
     path.write_text("x", encoding="utf-8")
-    observer = Observer.spacecraft_table(
-        "craft", str(path), checksum_sha256=file_sha256(path)
-    )
+    observer = Observer.spacecraft_table("craft", str(path), checksum_sha256=file_sha256(path))
     canonical = canonicalize(observer)
     assert "path" not in canonical["fields"]
     assert canonical["fields"]["checksum_sha256"].startswith("sha256:")
@@ -119,15 +115,11 @@ def test_solar_system_body_provider() -> None:
     assert isinstance(provider, SolarSystemBodyObserverV1)
     state = provider.state_at(T_O)
     assert np.allclose(state.position_au, EPHEMERIS.moon_barycentric_au(T_O))
-    assert np.allclose(
-        observer_barycentric_au(observer, T_O, EPHEMERIS), state.position_au
-    )
+    assert np.allclose(observer_barycentric_au(observer, T_O, EPHEMERIS), state.position_au)
     positions = provider.positions_au(Time([2021.0, 2022.0], format="jyear"))
     assert positions.shape == (2, 3)
     with pytest.raises(EphemerisError, match="no body 'mars'"):
-        resolve_observer_state_provider(
-            Observer.solar_system_body("mars"), EPHEMERIS
-        ).state_at(T_O)
+        resolve_observer_state_provider(Observer.solar_system_body("mars"), EPHEMERIS).state_at(T_O)
 
 
 # ---------------------------------------------------------------------------
@@ -163,9 +155,7 @@ def test_tabular_linear_interpolation(tmp_path: Path) -> None:
         [(1.0, 2.0, 3.0), (2.0, 4.0, 6.0)],
     )
     provider = resolve_observer_state_provider(
-        Observer.spacecraft_table(
-            "craft", str(path), checksum_sha256=file_sha256(path)
-        ),
+        Observer.spacecraft_table("craft", str(path), checksum_sha256=file_sha256(path)),
         EPHEMERIS,
     )
     assert isinstance(provider, TabularSpacecraftObserverV1)
@@ -207,55 +197,39 @@ def test_tabular_hermite_reproduces_a_cubic(tmp_path: Path) -> None:
         [velocity(t) for t in nodes],
     )
     provider = resolve_observer_state_provider(
-        Observer.spacecraft_table(
-            "cubic", str(path), checksum_sha256=file_sha256(path)
-        ),
+        Observer.spacecraft_table("cubic", str(path), checksum_sha256=file_sha256(path)),
         EPHEMERIS,
     )
     assert provider.interpolation == "cubic_hermite"
     for t_days in (1.7, 6.999, 10.5, 20.3):
-        state = provider.state_at(
-            Time(base_jd + t_days, format="jd", scale="tdb")
-        )
+        state = provider.state_at(Time(base_jd + t_days, format="jd", scale="tdb"))
         # abs=1e-9: Time stores ~2e-10 day quantization at this JD, far
         # below interpolation error scales but above exact float identity.
         assert state.position_au == pytest.approx(position(t_days), abs=1e-9)
         assert state.velocity_au_per_day == pytest.approx(velocity(t_days), abs=1e-9)
-    vector = provider.positions_au(
-        Time([base_jd + 1.7, base_jd + 10.5], format="jd", scale="tdb")
-    )
+    vector = provider.positions_au(Time([base_jd + 1.7, base_jd + 10.5], format="jd", scale="tdb"))
     assert vector[0] == pytest.approx(position(1.7), abs=1e-9)
 
 
 def test_tabular_identity_is_content_not_path(tmp_path: Path) -> None:
     clear_provider_cache()
-    first = write_table(
-        tmp_path / "a.ecsv", [2459000.0, 2459010.0], [(1, 2, 3), (2, 4, 6)]
-    )
+    first = write_table(tmp_path / "a.ecsv", [2459000.0, 2459010.0], [(1, 2, 3), (2, 4, 6)])
     second = tmp_path / "renamed.ecsv"
     shutil.copyfile(first, second)
     provider_a = TabularSpacecraftObserverV1(
-        Observer.spacecraft_table(
-            "craft", str(first), checksum_sha256=file_sha256(first)
-        )
+        Observer.spacecraft_table("craft", str(first), checksum_sha256=file_sha256(first))
     )
     provider_b = TabularSpacecraftObserverV1(
-        Observer.spacecraft_table(
-            "craft", str(second), checksum_sha256=file_sha256(second)
-        )
+        Observer.spacecraft_table("craft", str(second), checksum_sha256=file_sha256(second))
     )
     assert provider_a.content_hash == provider_b.content_hash
 
 
 def test_tabular_rejects_bad_tables(tmp_path: Path) -> None:
-    path = write_table(
-        tmp_path / "backwards.ecsv", [2459010.0, 2459000.0], [(1, 2, 3), (2, 4, 6)]
-    )
+    path = write_table(tmp_path / "backwards.ecsv", [2459010.0, 2459000.0], [(1, 2, 3), (2, 4, 6)])
     with pytest.raises(EphemerisError, match="strictly increasing"):
         TabularSpacecraftObserverV1(
-            Observer.spacecraft_table(
-                "craft", str(path), checksum_sha256=file_sha256(path)
-            )
+            Observer.spacecraft_table("craft", str(path), checksum_sha256=file_sha256(path))
         )
     with pytest.raises(EphemerisError, match="checksum mismatch"):
         TabularSpacecraftObserverV1(
@@ -297,9 +271,7 @@ def make_spk(path: Path, target_id: int, base_et: float) -> None:
         position_au = np.array([0.5 + 0.01 * k, -0.7, -0.3])
         velocity_au_day = np.array([0.01, 0.0, 0.0])
         states.append(
-            np.concatenate(
-                [position_au * km_per_au, velocity_au_day * km_per_au / 86_400.0]
-            )
+            np.concatenate([position_au * km_per_au, velocity_au_day * km_per_au / 86_400.0])
         )
         epochs.append(et)
     handle = spiceypy.spkopn(str(path), "test-craft", 0)
@@ -349,9 +321,7 @@ def test_spice_unknown_target(tmp_path: Path) -> None:
     make_spk(path, -999, 0.0)
     with pytest.raises(EphemerisError, match="no coverage for target"):
         resolve_observer_state_provider(
-            Observer.spacecraft_spice(
-                "craft", str(path), "-42", checksum_sha256=file_sha256(path)
-            ),
+            Observer.spacecraft_spice("craft", str(path), "-42", checksum_sha256=file_sha256(path)),
             EPHEMERIS,
         )
 
@@ -496,9 +466,7 @@ def test_request_yaml_parses_new_observer_kinds(tmp_path: Path) -> None:
         request = load_request(path)
         assert request.observer.kind is kind
         assert request.observer.observer_id == observer_block["name"]
-    bad = dict(
-        base, observer={"kind": "spacecraft_table", "name": "wise"}
-    )  # missing path
+    bad = dict(base, observer={"kind": "spacecraft_table", "name": "wise"})  # missing path
     path = tmp_path / "request.yaml"
     path.write_text(yaml.safe_dump(bad), encoding="utf-8")
     with pytest.raises(ConfigError, match="path"):
@@ -542,12 +510,7 @@ def test_crossing_search_with_tabular_spacecraft_observer(tmp_path: Path) -> Non
     epochs = [base_jd - 10.0 + 10.0 * k for k in range(14)]  # -10..+120 days
     velocity = -0.001 * perp_1
     positions = [
-        tuple(
-            sun
-            + 5.0 * axis
-            + (0.05 - 0.001 * (jd - base_jd)) * perp_1
-            + 0.02 * perp_2
-        )
+        tuple(sun + 5.0 * axis + (0.05 - 0.001 * (jd - base_jd)) * perp_1 + 0.02 * perp_2)
         for jd in epochs
     ]
     velocities = [tuple(velocity) for _ in epochs]
@@ -557,9 +520,7 @@ def test_crossing_search_with_tabular_spacecraft_observer(tmp_path: Path) -> Non
     request = CrossingsRequest(
         target_ids=("synth",),
         link_directions=(LinkDirection.INBOUND,),
-        intervals=(
-            TimeInterval(interval_id="i1", start=T_O, stop=T_O + 100.0),
-        ),
+        intervals=(TimeInterval(interval_id="i1", start=T_O, stop=T_O + 100.0),),
         observer=Observer.spacecraft_table(
             "craft", str(table_path), checksum_sha256=file_sha256(table_path)
         ),

@@ -72,8 +72,7 @@ def _cmd_validate_crossings(args: argparse.Namespace) -> int:
     print(f"OK: crossings request {args.path} is valid")
     print(f"  targets: {', '.join(request.target_ids)}")
     print(
-        "  link directions: "
-        f"{', '.join(direction.value for direction in request.link_directions)}"
+        f"  link directions: {', '.join(direction.value for direction in request.link_directions)}"
     )
     for interval in request.intervals:
         print(
@@ -94,10 +93,7 @@ def _cmd_samples(args: argparse.Namespace) -> int:
     from .sampling import segments_for_request
 
     segments = segments_for_request(load_request(args.request))
-    print(
-        "segment_id\ttarget_id\trole\tz_near_au\tz_rep_au\tz_far_au"
-        "\tq_hi_per_au\tq_lo_per_au"
-    )
+    print("segment_id\ttarget_id\trole\tz_near_au\tz_rep_au\tz_far_au\tq_hi_per_au\tq_lo_per_au")
     for segment in segments:
         print(
             f"{segment.segment_id}\t{segment.target_id}\t{segment.role.value}\t"
@@ -125,9 +121,7 @@ def _load_generation_inputs(
         "request_yaml": file_sha256(args.request),
     }
     if getattr(args, "epochs", None):
-        request = dataclasses.replace(
-            request, time=TimeList(epochs=load_epoch_table(args.epochs))
-        )
+        request = dataclasses.replace(request, time=TimeList(epochs=load_epoch_table(args.epochs)))
         input_hashes["epochs_table"] = file_sha256(args.epochs)
     return registry, request, input_hashes
 
@@ -174,9 +168,7 @@ def _cmd_plan(args: argparse.Namespace) -> int:
     from .planning import plan_commensal
 
     registry, request, input_hashes = _load_generation_inputs(args)
-    result = plan_commensal(
-        generate_loci(request, registry, strict=args.strict), registry
-    )
+    result = plan_commensal(generate_loci(request, registry, strict=args.strict), registry)
     return _write_and_report(result, args, input_hashes)
 
 
@@ -299,8 +291,7 @@ def build_parser() -> argparse.ArgumentParser:
     samples = subcommands.add_parser(
         "samples",
         help=(
-            "List a request's deterministic relay-range segments without "
-            "computing any astronomy."
+            "List a request's deterministic relay-range segments without computing any astronomy."
         ),
     )
     samples.add_argument("--request", required=True, help="Path to the request YAML.")
@@ -322,9 +313,7 @@ def build_parser() -> argparse.ArgumentParser:
             "(stable epoch_id join keys are preserved)."
         ),
     )
-    generate.add_argument(
-        "--output-dir", required=True, help="Directory for product files."
-    )
+    generate.add_argument("--output-dir", required=True, help="Directory for product files.")
     generate.add_argument(
         "--strict",
         action="store_true",
@@ -358,12 +347,8 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     crossings.add_argument("--targets", required=True, help="Target registry YAML.")
-    crossings.add_argument(
-        "--request", required=True, help="Crossings request YAML."
-    )
-    crossings.add_argument(
-        "--output-dir", required=True, help="Directory for product files."
-    )
+    crossings.add_argument("--request", required=True, help="Crossings request YAML.")
+    crossings.add_argument("--output-dir", required=True, help="Directory for product files.")
     crossings.add_argument(
         "--strict",
         action="store_true",
@@ -407,12 +392,8 @@ def build_parser() -> argparse.ArgumentParser:
             "checksum-identified local file for request 'iers' blocks."
         ),
     )
-    fetch_iers.add_argument(
-        "--output-dir", required=True, help="Directory to place the table in."
-    )
-    fetch_iers.add_argument(
-        "--url", help="Explicit table URL instead of astropy's IERS-A default."
-    )
+    fetch_iers.add_argument("--output-dir", required=True, help="Directory to place the table in.")
+    fetch_iers.add_argument("--url", help="Explicit table URL instead of astropy's IERS-A default.")
     fetch_iers.set_defaults(func=_cmd_fetch_iers)
 
     return parser

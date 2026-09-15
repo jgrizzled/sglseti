@@ -154,9 +154,7 @@ def write_products(
     if OutputFormat.JSON in formats:
         written["result_json"] = _write_json(output_dir / "result.json", result)
     if OutputFormat.CSV in formats:
-        written["samples_csv"] = _write_csv(
-            output_dir / "samples.csv", SAMPLE_COLUMNS, sample_rows
-        )
+        written["samples_csv"] = _write_csv(output_dir / "samples.csv", SAMPLE_COLUMNS, sample_rows)
         if pointing_rows:
             written["pointings_csv"] = _write_csv(
                 output_dir / "pointings.csv", POINTING_COLUMNS, pointing_rows
@@ -213,9 +211,7 @@ def write_samples_stream(
     JSON, DS9, pointing, and manifest products remain batch writers.
     """
     if rows_per_ecsv_part < 1:
-        raise ValueError(
-            f"rows_per_ecsv_part must be positive, got {rows_per_ecsv_part}"
-        )
+        raise ValueError(f"rows_per_ecsv_part must be positive, got {rows_per_ecsv_part}")
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     meta = {
@@ -260,10 +256,7 @@ def write_samples_stream(
                 row_count += 1
                 if csv_writer is not None:
                     csv_writer.writerow(
-                        {
-                            c: ("" if row.get(c) is None else row.get(c))
-                            for c in SAMPLE_COLUMNS
-                        }
+                        {c: ("" if row.get(c) is None else row.get(c)) for c in SAMPLE_COLUMNS}
                     )
                 if write_ecsv_parts:
                     part_buffer.append(row)
@@ -309,13 +302,16 @@ def result_manifest(
         "ephemeris_ids": sorted({s.ephemeris_id for s in result.samples}),
         "iers_id": result.iers_id,
         "target_state_providers": _provider_summary(
-            (s.target_id, s.target_provider_id, s.target_provider_version,
-             s.target_provider_hash)
+            (s.target_id, s.target_provider_id, s.target_provider_version, s.target_provider_hash)
             for s in result.samples
         ),
         "observer_state_providers": _provider_summary(
-            (s.observer_id, s.observer_provider_id, s.observer_provider_version,
-             s.observer_provider_hash)
+            (
+                s.observer_id,
+                s.observer_provider_id,
+                s.observer_provider_version,
+                s.observer_provider_hash,
+            )
             for s in result.samples
         ),
         "uncertainty": {
@@ -357,11 +353,7 @@ def _uncertainty_method(result: CalculationResult) -> str:
     methods = sorted({s.uncertainty_method.value for s in result.samples})
     if len(methods) == 1:
         return methods[0]
-    return (
-        "assumed"
-        if result.request.assumed_half_width_arcsec is not None
-        else "not_propagated"
-    )
+    return "assumed" if result.request.assumed_half_width_arcsec is not None else "not_propagated"
 
 
 def _time_semantics(request: Any) -> str:
@@ -391,12 +383,8 @@ def write_crossings_products(
     formats = set(result.request.output_formats)
     written: dict[str, Path] = {}
 
-    event_rows = [
-        _record_row(event, window_count=len(event.windows)) for event in result.events
-    ]
-    window_rows = [
-        _record_row(window) for event in result.events for window in event.windows
-    ]
+    event_rows = [_record_row(event, window_count=len(event.windows)) for event in result.events]
+    window_rows = [_record_row(window) for event in result.events for window in event.windows]
 
     meta = {
         "crossings_result_schema_version": CROSSINGS_RESULT_SCHEMA_VERSION,
@@ -416,12 +404,8 @@ def write_crossings_products(
             output_dir / "result.json", result, event_rows, window_rows
         )
     if OutputFormat.CSV in formats:
-        written["events_csv"] = _write_csv(
-            output_dir / "events.csv", EVENT_COLUMNS, event_rows
-        )
-        written["windows_csv"] = _write_csv(
-            output_dir / "windows.csv", WINDOW_COLUMNS, window_rows
-        )
+        written["events_csv"] = _write_csv(output_dir / "events.csv", EVENT_COLUMNS, event_rows)
+        written["windows_csv"] = _write_csv(output_dir / "windows.csv", WINDOW_COLUMNS, window_rows)
     if OutputFormat.VOTABLE in formats:
         written["events_votable"] = _write_votable(
             output_dir / "events.vot", EVENT_COLUMNS, event_rows, meta
@@ -449,9 +433,7 @@ def crossings_manifest(
     output_files: Mapping[str, str],
 ) -> dict[str, Any]:
     """Crossings manifest with science identity hashed apart from run data."""
-    axis_models = sorted(
-        {(e.axis_model_id, e.axis_model_version) for e in result.events}
-    )
+    axis_models = sorted({(e.axis_model_id, e.axis_model_version) for e in result.events})
     science: dict[str, Any] = {
         "crossings_result_schema_version": CROSSINGS_RESULT_SCHEMA_VERSION,
         "crossings_id": result.crossings_id,
@@ -616,9 +598,7 @@ def _write_csv(path: Path, columns: Sequence[str], rows: list[dict[str, Any]]) -
         writer = csv.DictWriter(handle, fieldnames=list(columns))
         writer.writeheader()
         for row in rows:
-            writer.writerow(
-                {c: ("" if row.get(c) is None else row.get(c)) for c in columns}
-            )
+            writer.writerow({c: ("" if row.get(c) is None else row.get(c)) for c in columns})
     return path
 
 
@@ -711,7 +691,7 @@ def _write_ds9(path: Path, result: CalculationResult) -> Path:
     for pointing in result.pointings:
         lines.append(
             f"circle({pointing.center_icrs_ra_deg:.9f},"
-            f"{pointing.center_icrs_dec_deg:.9f},{pointing.radius_arcsec:g}\") "
+            f'{pointing.center_icrs_dec_deg:.9f},{pointing.radius_arcsec:g}") '
             f"# color=cyan tag={{{pointing.pointing_id}}} "
             f"text={{{pointing.target_id}/{pointing.role.value}}}"
         )

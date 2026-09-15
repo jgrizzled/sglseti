@@ -250,18 +250,12 @@ def plan_calculation(
     # its identity enters the calculation ID exactly when those exist.
     iers_sensitive = want_cirs or want_altaz or request.observability is not None
     iers_resource = (
-        IersResource(request.iers)
-        if request.iers is not None and iers_sensitive
-        else None
+        IersResource(request.iers) if request.iers is not None and iers_sensitive else None
     )
     iers_id = (
-        (iers_resource.iers_id if iers_resource else bundled_iers_id())
-        if iers_sensitive
-        else None
+        (iers_resource.iers_id if iers_resource else bundled_iers_id()) if iers_sensitive else None
     )
-    calculation_id = _calculation_id(
-        request, model, ephemeris, target_hashes, iers_id
-    )
+    calculation_id = _calculation_id(request, model, ephemeris, target_hashes, iers_id)
     uncertainty_method = (
         UncertaintyMethod.ASSUMED
         if request.assumed_half_width_arcsec is not None
@@ -369,9 +363,7 @@ def _iter_chunks(
                         want_cirs=plan.want_cirs,
                         want_altaz=plan.want_altaz,
                         iers_resource=plan.iers_resource,
-                        target_provider=plan.target_provider_identities[
-                            target.target_id
-                        ],
+                        target_provider=plan.target_provider_identities[target.target_id],
                         observer_provider=plan.observer_provider_identity,
                     )
                     if sample.validity is Validity.INVALID:
@@ -554,9 +546,7 @@ def _compute_sample(
                 cirs = cirs_apparent(solution, iers_table=iers_table)
             if want_altaz:
                 altaz = altaz_apparent(solution, iers_table=iers_table)
-        apparent_warnings.extend(
-            dict.fromkeys(f"astropy:{w.message}" for w in caught)
-        )
+        apparent_warnings.extend(dict.fromkeys(f"astropy:{w.message}" for w in caught))
     rates = None
     near_rates = None
     if request.include_rates:
@@ -606,9 +596,7 @@ def _compute_sample(
         target_event_kind=direction.target_event_kind,
         target_light_time_days=direction.target_light_time_days,
         sun_relay_light_time_days=direction.sun_relay_light_time_days,
-        observer_relay_light_time_days_approx=(
-            direction.observer_relay_light_time_days_approx
-        ),
+        observer_relay_light_time_days_approx=(direction.observer_relay_light_time_days_approx),
         z_au=z_au,
         q_per_au=1.0 / z_au,
         icrs_ra_deg=solution.los_icrs_ra_deg,
@@ -634,9 +622,7 @@ def _compute_sample(
         cirs_dec_deg=cirs[1],
         altaz_alt_deg=altaz[0],
         altaz_az_deg=altaz[1],
-        rate_ra_cosdec_arcsec_per_hr=(
-            rates.rate_ra_cosdec_arcsec_per_hr if rates else None
-        ),
+        rate_ra_cosdec_arcsec_per_hr=(rates.rate_ra_cosdec_arcsec_per_hr if rates else None),
         rate_dec_arcsec_per_hr=rates.rate_dec_arcsec_per_hr if rates else None,
         z_near_au=segment.z_near_au,
         z_far_au=segment.z_far_au,
@@ -649,9 +635,7 @@ def _compute_sample(
         near_rate_ra_cosdec_arcsec_per_hr=(
             near_rates.rate_ra_cosdec_arcsec_per_hr if near_rates else None
         ),
-        near_rate_dec_arcsec_per_hr=(
-            near_rates.rate_dec_arcsec_per_hr if near_rates else None
-        ),
+        near_rate_dec_arcsec_per_hr=(near_rates.rate_dec_arcsec_per_hr if near_rates else None),
     )
 
 

@@ -197,8 +197,7 @@ def _parse_utc(value: Any, ctx: str, fail: _Fail) -> Time:
     if parsed.tzinfo is None:
         fail(
             ctx,
-            f"timestamp {value!r} has no UTC designator or offset; "
-            "use e.g. 2021-11-06T03:14:00Z",
+            f"timestamp {value!r} has no UTC designator or offset; use e.g. 2021-11-06T03:14:00Z",
         )
     naive_utc = parsed.astimezone(UTC).replace(tzinfo=None)
     return Time(naive_utc, scale="utc", format="datetime")
@@ -249,9 +248,7 @@ def load_epoch_table(path: str | Path) -> tuple[Epoch, ...]:
         seen.add(epoch_id)
         time = _parse_utc(row.get("time_utc"), f"{ctx}.time_utc", fail)
         metadata = {column: str(row[column]) for column in extra_columns}
-        epochs.append(
-            _build(ctx, fail, Epoch, epoch_id=epoch_id, time=time, metadata=metadata)
-        )
+        epochs.append(_build(ctx, fail, Epoch, epoch_id=epoch_id, time=time, metadata=metadata))
     return tuple(epochs)
 
 
@@ -326,9 +323,7 @@ def load_request(path: str | Path) -> GeometryRequest:
     model_id, model_parameters = _parse_model(data.get("model"), fail)
     ephemeris = _parse_ephemeris(data.get("ephemeris"), fail)
     iers = _parse_iers(data.get("iers"), fail)
-    coordinate_products, include_rates, output_formats = _parse_products(
-        data.get("products"), fail
-    )
+    coordinate_products, include_rates, output_formats = _parse_products(data.get("products"), fail)
     assumed_half_width = _parse_uncertainty(data.get("uncertainty"), fail)
     observability = _parse_observability(data.get("observability"), fail)
     fov = _parse_fov(data.get("fov"), fail)
@@ -463,13 +458,9 @@ def _parse_inline_epochs(raw: Any, fail: _Fail) -> tuple[Epoch, ...]:
             fail(ctx, "missing required key time_utc")
         time = _parse_utc(entry["time_utc"], f"{ctx}.time_utc", fail)
         metadata = {
-            key: str(value)
-            for key, value in entry.items()
-            if key not in {"epoch_id", "time_utc"}
+            key: str(value) for key, value in entry.items() if key not in {"epoch_id", "time_utc"}
         }
-        epochs.append(
-            _build(ctx, fail, Epoch, epoch_id=epoch_id, time=time, metadata=metadata)
-        )
+        epochs.append(_build(ctx, fail, Epoch, epoch_id=epoch_id, time=time, metadata=metadata))
     return tuple(epochs)
 
 
@@ -584,9 +575,7 @@ def _parse_relay_range(raw: Any, fail: _Fail) -> tuple[RelayRange, SamplingSpec]
         kwargs["count"] = _integer(sampling_block, "count", "relay_range.sampling", fail)
     elif kind is SamplingKind.RECIPROCAL_STEP:
         allowed.add("step_arcsec")
-        kwargs["step_arcsec"] = _number(
-            sampling_block, "step_arcsec", "relay_range.sampling", fail
-        )
+        kwargs["step_arcsec"] = _number(sampling_block, "step_arcsec", "relay_range.sampling", fail)
     else:
         allowed.add("distances_au")
         distances = sampling_block.get("distances_au")
@@ -676,8 +665,7 @@ def _parse_products(
             except ValueError:
                 fail(
                     "products.coordinates",
-                    f"unknown product {name!r}; choose from "
-                    f"{[c.value for c in CoordinateProduct]}",
+                    f"unknown product {name!r}; choose from {[c.value for c in CoordinateProduct]}",
                 )
         coordinates = tuple(parsed)
     rates = block.get("rates", False)
@@ -773,8 +761,7 @@ def _parse_link_directions(raw: Any, fail: _Fail) -> tuple[LinkDirection, ...]:
         except ValueError:
             fail(
                 "link_directions",
-                f"unknown direction {name!r}; choose from "
-                f"{[d.value for d in LinkDirection]}",
+                f"unknown direction {name!r}; choose from {[d.value for d in LinkDirection]}",
             )
     return tuple(directions)
 
@@ -795,9 +782,7 @@ def _parse_intervals(raw: Any, fail: _Fail) -> tuple[TimeInterval, ...]:
         start = _parse_utc(entry.get("start_utc"), f"{ctx}.start_utc", fail)
         stop = _parse_utc(entry.get("stop_utc"), f"{ctx}.stop_utc", fail)
         intervals.append(
-            _build(
-                ctx, fail, TimeInterval, interval_id=interval_id, start=start, stop=stop
-            )
+            _build(ctx, fail, TimeInterval, interval_id=interval_id, start=start, stop=stop)
         )
     return tuple(intervals)
 
@@ -816,9 +801,7 @@ def _parse_beam(raw: Any, fail: _Fail) -> tuple[tuple[float, ...], float | None]
             fail("beam.radii_au", "must be a list of numbers")
         radii = tuple(float(v) for v in values)
     report_max = (
-        _number(block, "report_max_b_au", "beam", fail)
-        if "report_max_b_au" in block
-        else None
+        _number(block, "report_max_b_au", "beam", fail) if "report_max_b_au" in block else None
     )
     return radii, report_max
 
@@ -828,11 +811,7 @@ def _parse_scan(raw: Any, fail: _Fail) -> tuple[float | None, float | None]:
         return None, None
     block = _mapping(raw, "scan", fail)
     _check_keys(block, {"coarse_step_days", "refine_tolerance_s"}, "scan", fail)
-    step = (
-        _number(block, "coarse_step_days", "scan", fail)
-        if "coarse_step_days" in block
-        else None
-    )
+    step = _number(block, "coarse_step_days", "scan", fail) if "coarse_step_days" in block else None
     tolerance = (
         _number(block, "refine_tolerance_s", "scan", fail)
         if "refine_tolerance_s" in block
@@ -893,13 +872,9 @@ def _parse_observability(raw: Any, fail: _Fail) -> ObservabilityConstraints | No
         "observability",
         fail,
         ObservabilityConstraints,
-        min_target_altitude_deg=_number(
-            block, "min_target_altitude_deg", "observability", fail
-        ),
+        min_target_altitude_deg=_number(block, "min_target_altitude_deg", "observability", fail),
         max_sun_altitude_deg=_number(block, "max_sun_altitude_deg", "observability", fail),
-        min_moon_separation_deg=_number(
-            block, "min_moon_separation_deg", "observability", fail
-        ),
+        min_moon_separation_deg=_number(block, "min_moon_separation_deg", "observability", fail),
     )
     return constraints
 
@@ -915,8 +890,6 @@ def _parse_fov(raw: Any, fail: _Fail) -> FieldOfView | None:
         fail,
         FieldOfView,
         radius_arcsec=_number(block, "radius_arcsec", "fov", fail),
-        exposure_s=(
-            _number(block, "exposure_s", "fov", fail) if "exposure_s" in block else None
-        ),
+        exposure_s=(_number(block, "exposure_s", "fov", fail) if "exposure_s" in block else None),
     )
     return fov

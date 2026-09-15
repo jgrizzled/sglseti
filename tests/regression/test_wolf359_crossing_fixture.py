@@ -48,9 +48,7 @@ from sglseti.models import (
 from sglseti.targets import TargetRegistry
 
 FIXTURE = load_reference_fixture("wolf359_crossing_reference.yaml")
-KERNEL = Path(__file__).resolve().parents[1] / "data" / "kernels" / (
-    "de440s_excerpt_2010-2035.bsp"
-)
+KERNEL = Path(__file__).resolve().parents[1] / "data" / "kernels" / ("de440s_excerpt_2010-2035.bsp")
 
 pytest.importorskip("jplephem")
 
@@ -121,24 +119,18 @@ def test_engine_reproduces_frozen_minimum(crossing_events, year: int) -> None:
     t_ca = Time(event.t_ca_tdb_jd, format="jd", scale="tdb")
     frozen_t = Time(frozen["computed_crossing_tdb_jd"], format="jd", scale="tdb")
     assert abs(float((t_ca - frozen_t).sec)) < 60.0
-    assert event.b_min_solar_radii == pytest.approx(
-        frozen["computed_b_min_rsun"], abs=5e-3
-    )
+    assert event.b_min_solar_radii == pytest.approx(frozen["computed_b_min_rsun"], abs=5e-3)
 
 
 @pytest.mark.parametrize("year", sorted(FIXTURE["years"]))
-def test_disagreement_with_published_epochs_is_preserved(
-    crossing_events, year: int
-) -> None:
+def test_disagreement_with_published_epochs_is_preserved(crossing_events, year: int) -> None:
     """The known offset from the published epochs is the EXPECTED result."""
     frozen = FIXTURE["years"][year]
     event = crossing_events[year]
     published = Time(frozen["published_crossing_utc"], scale="utc")
     t_ca = Time(event.t_ca_tdb_jd, format="jd", scale="tdb")
     offset_hours = float((t_ca - published.tdb).to_value(u.h))
-    assert offset_hours == pytest.approx(
-        frozen["offset_from_published_hours"], abs=0.2
-    )
+    assert offset_hours == pytest.approx(frozen["offset_from_published_hours"], abs=0.2)
     # A "fix" that reconciles us with the published epochs would be a
     # regression: at those epochs the Earth is outside the paper's own
     # 1.1 R_sun annulus.
@@ -151,9 +143,7 @@ def test_disagreement_with_published_epochs_is_preserved(
         z_au=FIXTURE["relay_distance_au"],
         ephemeris=AstropyEphemeris(ephemeris_spec()),
     )
-    assert sample.b_solar_radii == pytest.approx(
-        frozen["b_at_published_epoch_rsun"], abs=5e-2
-    )
+    assert sample.b_solar_radii == pytest.approx(frozen["b_at_published_epoch_rsun"], abs=5e-2)
     assert sample.b_solar_radii > FIXTURE["published_annulus_rsun"]
 
 
@@ -163,9 +153,7 @@ def test_tx_pointing_matches_publication() -> None:
     site = FIXTURE["trappist_south_site"]
     solution = compute_relay_solution(
         target=wolf359_target(),
-        observation_time=Time(
-            FIXTURE["years"][2015]["published_crossing_utc"], scale="utc"
-        ),
+        observation_time=Time(FIXTURE["years"][2015]["published_crossing_utc"], scale="utc"),
         z_au=FIXTURE["relay_distance_au"],
         role=Role.TX,
         observer=Observer.from_geodetic(
@@ -174,9 +162,7 @@ def test_tx_pointing_matches_publication() -> None:
         ephemeris=AstropyEphemeris(ephemeris_spec()),
         model=Tusay2022Eq57V1(),
     )
-    computed = SkyCoord(
-        solution.los_icrs_ra_deg * u.deg, solution.los_icrs_dec_deg * u.deg
-    )
+    computed = SkyCoord(solution.los_icrs_ra_deg * u.deg, solution.los_icrs_dec_deg * u.deg)
     frozen = FIXTURE["tx_pointing_at_published_2015_epoch"]
     reference = SkyCoord(frozen["ra_deg"] * u.deg, frozen["dec_deg"] * u.deg)
     assert computed.separation(reference).to_value(u.arcsec) < 1.0

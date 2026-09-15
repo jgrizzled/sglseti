@@ -35,9 +35,7 @@ from sglseti.providers import (
 
 pytest.importorskip("jplephem")
 
-KERNEL = Path(__file__).resolve().parents[1] / "data" / "kernels" / (
-    "de440s_excerpt_2010-2035.bsp"
-)
+KERNEL = Path(__file__).resolve().parents[1] / "data" / "kernels" / ("de440s_excerpt_2010-2035.bsp")
 MODEL = Tusay2022Eq57V1()
 
 
@@ -62,9 +60,7 @@ def wolf359() -> Target:
 
 @pytest.fixture(scope="module")
 def kernel_ephemeris() -> AstropyEphemeris:
-    return AstropyEphemeris(
-        EphemerisSpec(adapter=EphemerisAdapter.JPL_FILE, path=str(KERNEL))
-    )
+    return AstropyEphemeris(EphemerisSpec(adapter=EphemerisAdapter.JPL_FILE, path=str(KERNEL)))
 
 
 def _separation_mas(a, b) -> float:
@@ -119,9 +115,7 @@ def test_tx_epoch_amplification_scaling(kernel_ephemeris) -> None:
     antipode = compute_relay_solution(role=Role.ANTIPODE, **common)
     measured_arcsec = _separation_mas(tx, antipode) / 1000.0
     mu_arcsec_per_yr = math.hypot(-3866.338, -2699.215) / 1000.0
-    predicted_arcsec = (
-        mu_arcsec_per_yr * 2.0 * tx.direction.target_light_time_days / 365.25
-    )
+    predicted_arcsec = mu_arcsec_per_yr * 2.0 * tx.direction.target_light_time_days / 365.25
     assert measured_arcsec == pytest.approx(predicted_arcsec, rel=0.01)
     assert 70.0 < measured_arcsec < 80.0  # ~74 arcsec for Wolf 359
 
@@ -138,9 +132,7 @@ def test_spacecraft_displacement_scaling(kernel_ephemeris) -> None:
         ephemeris=kernel_ephemeris,
         model=MODEL,
     )
-    earth_solution = compute_relay_solution(
-        observer=Observer.earth_center(), **common
-    )
+    earth_solution = compute_relay_solution(observer=Observer.earth_center(), **common)
     line_of_sight = np.array(earth_solution.relay_barycentric_au) - np.array(
         earth_solution.observer_barycentric_au
     )
@@ -173,9 +165,7 @@ def test_solar_motion_light_time_class(kernel_ephemeris) -> None:
     for jyear in np.linspace(2013.0, 2030.0, 40):
         t1 = Time(jyear, format="jyear", scale="tdb")
         t2 = Time(jyear + 0.01, format="jyear", scale="tdb")
-        delta_au = kernel_ephemeris.sun_barycentric_au(
-            t2
-        ) - kernel_ephemeris.sun_barycentric_au(t1)
+        delta_au = kernel_ephemeris.sun_barycentric_au(t2) - kernel_ephemeris.sun_barycentric_au(t1)
         speeds_km_s.append(
             float(np.linalg.norm(delta_au)) * 149_597_870.7 / (0.01 * 365.25 * 86_400.0)
         )

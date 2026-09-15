@@ -108,8 +108,7 @@ from sglseti import generate_loci, load_request, load_target_registry, write_pro
 
 registry = load_target_registry("examples/targets.yaml")
 result = generate_loci(load_request("examples/historical.yaml"), registry)
-write_products(result, "build/archive-targets",
-               generated_utc="2026-08-18T00:00:00+00:00")
+write_products(result, "build/archive-targets", generated_utc="2026-08-18T00:00:00+00:00")
 ```
 
 Every output row keeps its caller-supplied `epoch_id` join key, its
@@ -120,11 +119,18 @@ circumstance. A taste of the survey-facing API:
 
 ```python
 from astropy.time import Time
-from sglseti import (AstropyEphemeris, Observer, RelayRange, Role,
-                     Tusay2022Eq57V1, adaptive_locus, covered_z_intervals)
+from sglseti import (
+    AstropyEphemeris,
+    Observer,
+    RelayRange,
+    Role,
+    Tusay2022Eq57V1,
+    adaptive_locus,
+    covered_z_intervals,
+)
 
-locus = adaptive_locus(                     # polyline within 0.5" of the
-    target=registry["barnard"],             # continuous locus, guaranteed
+locus = adaptive_locus(  # polyline within 0.5" of the
+    target=registry["barnard"],  # continuous locus, guaranteed
     role=Role.RX,
     observation_time=Time("2015-09-05T07:41:00", scale="utc"),
     observer=Observer.earth_center(),

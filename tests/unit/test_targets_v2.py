@@ -115,9 +115,7 @@ def test_v2_metadata_changes_identity(tmp_path: Path) -> None:
     enriched_target = linear_v2_target(
         identifiers=[{"catalog": "Gaia", "id": "123", "version": "DR3"}]
     )
-    enriched = load_target_registry(
-        write_registry(tmp_path, {"t": enriched_target})
-    )
+    enriched = load_target_registry(write_registry(tmp_path, {"t": enriched_target}))
     assert enriched.to_normalized_dict()["schema_version"] == 2
     assert enriched.source_hash != base.source_hash
 
