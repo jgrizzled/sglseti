@@ -33,7 +33,7 @@ One stateless, epoch-neutral engine supports the core workflows:
 - Geometry: the reviewed `tusay2022_eq5_7_v1` role model (Tusay et al.
   2022 eq. 5–7) and the `sun_star_axis_v1` crossing-axis contract, with
   every approximation declared per row and quantified in the
-  [accuracy budget](docs/accuracy_budget.md).
+  [accuracy budget](https://github.com/jgrizzled/sglseti/blob/main/docs/accuracy_budget.md).
 - Target motion: pluggable provider families — linear astrometry, catalog
   acceleration solutions, two-body orbits for resolved binaries and
   barycenters (validated against the published Alpha Cen AB and Sirius AB
@@ -63,18 +63,18 @@ gated or demand-driven (see the note).
 
 ## Documentation
 
-- [Quick start](docs/quickstart.md) — all workflows, CLI and Python
-- [Target registry](docs/registry.md) — schema, provider families,
+- [Quick start](https://github.com/jgrizzled/sglseti/blob/main/docs/quickstart.md) — all workflows, CLI and Python
+- [Target registry](https://github.com/jgrizzled/sglseti/blob/main/docs/registry.md) — schema, provider families,
   provenance and covariance blocks
-- [Conventions and product reference](docs/conventions.md) — frames, time
+- [Conventions and product reference](https://github.com/jgrizzled/sglseti/blob/main/docs/conventions.md) — frames, time
   scales, role epochs, every output column
-- [Accuracy budget](docs/accuracy_budget.md) — measured floors and declared
+- [Accuracy budget](https://github.com/jgrizzled/sglseti/blob/main/docs/accuracy_budget.md) — measured floors and declared
   approximations by model, observer type, epoch span, and provider
-- [Resources](docs/resources.md) — pinned ephemeris kernels and IERS, offline
-- [Limitations](docs/limitations.md) — model validity and boundaries
-- [Benchmarks](docs/benchmarks.md) — archive-scale performance measurements
-- [Science specification](docs/science/geometry_models.md) and
-  [ADRs](docs/adr/) — the reviewed model contracts
+- [Resources](https://github.com/jgrizzled/sglseti/blob/main/docs/resources.md) — pinned ephemeris kernels and IERS, offline
+- [Limitations](https://github.com/jgrizzled/sglseti/blob/main/docs/limitations.md) — model validity and boundaries
+- [Benchmarks](https://github.com/jgrizzled/sglseti/blob/main/docs/benchmarks.md) — archive-scale performance measurements
+- [Science specification](https://github.com/jgrizzled/sglseti/blob/main/docs/science/geometry_models.md) and
+  [ADRs](https://github.com/jgrizzled/sglseti/tree/main/docs/adr) — the reviewed model contracts
 
 ## Installation
 
@@ -137,7 +137,7 @@ locus = adaptive_locus(                     # polyline within 0.5" of the
 # covered_z_intervals(contains=your_footprint_test, ...)
 ```
 
-See the [quick start](docs/quickstart.md) for observation intervals,
+See the [quick start](https://github.com/jgrizzled/sglseti/blob/main/docs/quickstart.md) for observation intervals,
 uncertainty propagation, crossings, and chunked archive-scale execution.
 
 ## Ephemeris resources
